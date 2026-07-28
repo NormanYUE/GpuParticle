@@ -1,0 +1,20 @@
+{
+  "name": "com.hlwd.gpu-particle",
+  "displayName": "HLWD GPU Particle",
+  "version": "0.1.0",
+  "unity": "2022.3",
+  "description": "Reusable GPU particle baking and playback package with Native fallback.",
+  "keywords": [
+    "particle",
+    "gpu",
+    "vfx",
+    "baker",
+    "runtime"
+  ],
+  "author": {
+    "name": "HLWD"
+  },
+  "dependencies": {
+    "com.unity.render-pipelines.universal": "14.0.12"
+  }
+}
