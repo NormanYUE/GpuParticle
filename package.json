@@ -1,6 +1,6 @@
 {
   "name": "com.gpuparticle.tool",
-  "displayName": "HLWD GPU Particle",
+  "displayName": "GPU Particle",
   "version": "0.1.0",
   "unity": "2022.3",
   "description": "Reusable GPU particle baking and playback package with Native fallback.",
