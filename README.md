@@ -21,16 +21,16 @@ This precompiled package contains:
 
 ### Current Scope
 
-Version `0.1.0` implements the safe geometry playback path for Mesh particle renderers:
+Version `0.1.0` implements the safe geometry playback path:
 
 - Editor sampling runs the original Unity particle system in an isolated preview scene.
 - Mesh and Trail output is captured through `ParticleSystemRenderer.BakeMesh` and `BakeTrailsMesh`.
 - Runtime playback draws baked geometry frames with the original materials.
-- Billboard and Stretched Billboard renderers are kept Native in this build because they require the state-track camera-facing renderer.
+- Billboard, Stretched Billboard, and camera-facing Mesh renderers can be baked as camera-constrained geometry. At runtime, if the active camera does not match the bake profile, playback requests Native fallback instead of drawing the wrong result.
 - Prefabs with unsupported runtime-world inputs such as Collision, Trigger or External Forces are marked `保留原生`.
 - Payload headers are CRC-checked before playback. Missing or stale data returns to Native fallback.
 
-The Compute/state-track renderer described in the implementation plan is represented by runtime contracts and capability flags, but is not enabled in this DLL build yet.
+The Compute/state-track renderer described in the implementation plan is represented by runtime contracts and capability flags, but is not enabled in this DLL build yet. Camera-constrained geometry is a conservative bridge for fixed-camera effects.
 
 ## 中文
 
@@ -53,13 +53,13 @@ HLWD GPU 粒子是一个可复用 Unity 包，用于把选中的 `ParticleSystem
 
 ### 当前范围
 
-`0.1.0` 实现了面向 Mesh 粒子 Renderer 的安全几何回放路径：
+`0.1.0` 实现了安全几何回放路径：
 
 - Editor 在隔离 Preview Scene 中运行原始 Unity 粒子。
 - 通过 `ParticleSystemRenderer.BakeMesh` 与 `BakeTrailsMesh` 捕获 Mesh 和 Trail 输出。
 - Runtime 使用原材质绘制烘焙出的几何帧。
-- Billboard 和 Stretched Billboard 在当前构建中会保留原生，因为它们需要后续 state-track 摄像机朝向重建器。
+- Billboard、Stretched Billboard 和摄像机朝向 Mesh 可以烘焙为“摄像机约束几何”。运行时如果当前摄像机与烘焙 Profile 不匹配，会请求 Native 回退，不会错误绘制。
 - Collision、Trigger、External Forces 等依赖运行时世界输入的 Prefab 会标记为 `保留原生`。
 - 播放前会校验 Payload Header 与 CRC；缺失或过期数据会回退 Native。
 
-实施计划中的 Compute/state-track 渲染器已经保留运行时契约和 Capability 标记，但当前 DLL 构建尚未启用。
+实施计划中的 Compute/state-track 渲染器已经保留运行时契约和 Capability 标记，但当前 DLL 构建尚未启用。摄像机约束几何是面向固定摄像机特效的保守过渡路径。
