@@ -25,7 +25,7 @@ Version `0.1.0` implements the safe geometry playback path:
 
 - Editor sampling runs the original Unity particle system in an isolated preview scene.
 - Mesh and Trail output is captured through `ParticleSystemRenderer.BakeMesh` and `BakeTrailsMesh`.
-- Runtime playback draws baked geometry frames with the original materials.
+- Runtime playback draws baked geometry frames with the original materials and preserves particle sorting layer/order as a renderer-priority approximation.
 - Billboard, Stretched Billboard, and camera-facing Mesh renderers can be baked as camera-constrained geometry. At runtime, if the active camera does not match the bake profile, playback requests Native fallback instead of drawing the wrong result.
 - Prefabs with unsupported runtime-world inputs such as Collision, Trigger or External Forces are marked `保留原生`.
 - Payload headers are CRC-checked before playback. Missing or stale data returns to Native fallback.
@@ -57,7 +57,7 @@ HLWD GPU 粒子是一个可复用 Unity 包，用于把选中的 `ParticleSystem
 
 - Editor 在隔离 Preview Scene 中运行原始 Unity 粒子。
 - 通过 `ParticleSystemRenderer.BakeMesh` 与 `BakeTrailsMesh` 捕获 Mesh 和 Trail 输出。
-- Runtime 使用原材质绘制烘焙出的几何帧。
+- Runtime 使用原材质绘制烘焙出的几何帧，并用 renderer-priority 近似保留粒子的 Sorting Layer/Order。
 - Billboard、Stretched Billboard 和摄像机朝向 Mesh 可以烘焙为“摄像机约束几何”。运行时如果当前摄像机与烘焙 Profile 不匹配，会请求 Native 回退，不会错误绘制。
 - Collision、Trigger、External Forces 等依赖运行时世界输入的 Prefab 会标记为 `保留原生`。
 - 播放前会校验 Payload Header 与 CRC；缺失或过期数据会回退 Native。
