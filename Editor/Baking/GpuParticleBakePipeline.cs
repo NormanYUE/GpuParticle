@@ -406,7 +406,7 @@ namespace GpuParticle.Editor
                 {
                     Position = p.position,
                     Velocity = p.velocity,
-                    Size = p.GetCurrentSize3D(renderer).x,
+                    Size = p.GetCurrentSize3D(system).x,
                     Rotation = new Vector4(p.rotation3D.x, p.rotation3D.y, p.rotation3D.z, 1f),
                     Color = p.GetCurrentColor(system),
                     Lifetime = 1f - p.remainingLifetime / Mathf.Max(p.startLifetime, 0.0001f),
@@ -452,7 +452,7 @@ namespace GpuParticle.Editor
                 {
                     Position = p.position,
                     Rotation = Quaternion.Euler(p.rotation3D),
-                    Scale = Vector3.one * p.GetCurrentSize3D(renderer).x,
+                    Scale = Vector3.one * p.GetCurrentSize3D(system).x,
                     Color = p.GetCurrentColor(system),
                 };
 
@@ -505,7 +505,7 @@ namespace GpuParticle.Editor
                     ParticleId = id,
                 });
 
-                int maxHistory = Mathf.CeilToInt(system.trails.lifetime * 120f) + 2;
+                int maxHistory = Mathf.CeilToInt(system.trails.lifetime.constantMax * 120f) + 2;
                 while (points.Count > maxHistory)
                 {
                     points.RemoveAt(points.Count - 1);
