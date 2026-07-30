@@ -1,0 +1,117 @@
+{
+  "version": 3,
+  "targets": {
+    "net9.0": {
+      "GpuParticle.Editor/1.0.0": {
+        "type": "project",
+        "framework": ".NETStandard,Version=v2.1",
+        "dependencies": {
+          "GpuParticle.Runtime": "1.0.0"
+        },
+        "compile": {
+          "bin/placeholder/GpuParticle.Editor.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/GpuParticle.Editor.dll": {}
+        }
+      },
+      "GpuParticle.Runtime/1.0.0": {
+        "type": "project",
+        "framework": ".NETStandard,Version=v2.1",
+        "compile": {
+          "bin/placeholder/GpuParticle.Runtime.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/GpuParticle.Runtime.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "GpuParticle.Editor/1.0.0": {
+      "type": "project",
+      "path": "../Editor/GpuParticle.Editor.csproj",
+      "msbuildProject": "../Editor/GpuParticle.Editor.csproj"
+    },
+    "GpuParticle.Runtime/1.0.0": {
+      "type": "project",
+      "path": "../Runtime/GpuParticle.Runtime.csproj",
+      "msbuildProject": "../Runtime/GpuParticle.Runtime.csproj"
+    }
+  },
+  "projectFileDependencyGroups": {
+    "net9.0": [
+      "GpuParticle.Editor >= 1.0.0",
+      "GpuParticle.Runtime >= 1.0.0"
+    ]
+  },
+  "packageFolders": {
+    "/Users/norman/.nuget/packages/": {}
+  },
+  "project": {
+    "version": "1.0.0",
+    "restore": {
+      "projectUniqueName": "/Users/norman/Documents/RiderProjects/GpuParticle/Tests/GpuParticle.Tests.csproj",
+      "projectName": "GpuParticle.Tests",
+      "projectPath": "/Users/norman/Documents/RiderProjects/GpuParticle/Tests/GpuParticle.Tests.csproj",
+      "packagesPath": "/Users/norman/.nuget/packages/",
+      "outputPath": "/Users/norman/Documents/RiderProjects/GpuParticle/Tests/obj/",
+      "projectStyle": "PackageReference",
+      "configFilePaths": [
+        "/Users/norman/.nuget/NuGet/NuGet.Config"
+      ],
+      "originalTargetFrameworks": [
+        "net9.0"
+      ],
+      "sources": {
+        "https://api.nuget.org/v3/index.json": {}
+      },
+      "frameworks": {
+        "net9.0": {
+          "targetAlias": "net9.0",
+          "projectReferences": {
+            "/Users/norman/Documents/RiderProjects/GpuParticle/Editor/GpuParticle.Editor.csproj": {
+              "projectPath": "/Users/norman/Documents/RiderProjects/GpuParticle/Editor/GpuParticle.Editor.csproj"
+            },
+            "/Users/norman/Documents/RiderProjects/GpuParticle/Runtime/GpuParticle.Runtime.csproj": {
+              "projectPath": "/Users/norman/Documents/RiderProjects/GpuParticle/Runtime/GpuParticle.Runtime.csproj"
+            }
+          }
+        }
+      },
+      "warningProperties": {
+        "warnAsError": [
+          "NU1605"
+        ]
+      },
+      "restoreAuditProperties": {
+        "enableAudit": "true",
+        "auditLevel": "low",
+        "auditMode": "all"
+      },
+      "SdkAnalysisLevel": "9.0.100"
+    },
+    "frameworks": {
+      "net9.0": {
+        "targetAlias": "net9.0",
+        "imports": [
+          "net461",
+          "net462",
+          "net47",
+          "net471",
+          "net472",
+          "net48",
+          "net481"
+        ],
+        "assetTargetFallback": true,
+        "warn": true,
+        "frameworkReferences": {
+          "Microsoft.NETCore.App": {
+            "privateAssets": "all"
+          }
+        },
+        "runtimeIdentifierGraphPath": "/Users/norman/.dotnet/sdk/9.0.100/PortableRuntimeIdentifierGraph.json"
+      }
+    }
+  }
+}

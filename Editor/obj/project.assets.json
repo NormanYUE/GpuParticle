@@ -1,0 +1,95 @@
+{
+  "version": 3,
+  "targets": {
+    ".NETStandard,Version=v2.1": {
+      "GpuParticle.Runtime/1.0.0": {
+        "type": "project",
+        "framework": ".NETStandard,Version=v2.1",
+        "compile": {
+          "bin/placeholder/GpuParticle.Runtime.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/GpuParticle.Runtime.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "GpuParticle.Runtime/1.0.0": {
+      "type": "project",
+      "path": "../Runtime/GpuParticle.Runtime.csproj",
+      "msbuildProject": "../Runtime/GpuParticle.Runtime.csproj"
+    }
+  },
+  "projectFileDependencyGroups": {
+    ".NETStandard,Version=v2.1": [
+      "GpuParticle.Runtime >= 1.0.0"
+    ]
+  },
+  "packageFolders": {
+    "/Users/norman/.nuget/packages/": {}
+  },
+  "project": {
+    "version": "1.0.0",
+    "restore": {
+      "projectUniqueName": "/Users/norman/Documents/RiderProjects/GpuParticle/Editor/GpuParticle.Editor.csproj",
+      "projectName": "GpuParticle.Editor",
+      "projectPath": "/Users/norman/Documents/RiderProjects/GpuParticle/Editor/GpuParticle.Editor.csproj",
+      "packagesPath": "/Users/norman/.nuget/packages/",
+      "outputPath": "/Users/norman/Documents/RiderProjects/GpuParticle/Editor/obj/",
+      "projectStyle": "PackageReference",
+      "configFilePaths": [
+        "/Users/norman/.nuget/NuGet/NuGet.Config"
+      ],
+      "originalTargetFrameworks": [
+        "netstandard2.1"
+      ],
+      "sources": {
+        "https://api.nuget.org/v3/index.json": {}
+      },
+      "frameworks": {
+        "netstandard2.1": {
+          "targetAlias": "netstandard2.1",
+          "projectReferences": {
+            "/Users/norman/Documents/RiderProjects/GpuParticle/Runtime/GpuParticle.Runtime.csproj": {
+              "projectPath": "/Users/norman/Documents/RiderProjects/GpuParticle/Runtime/GpuParticle.Runtime.csproj"
+            }
+          }
+        }
+      },
+      "warningProperties": {
+        "warnAsError": [
+          "NU1605"
+        ]
+      },
+      "restoreAuditProperties": {
+        "enableAudit": "true",
+        "auditLevel": "low",
+        "auditMode": "all"
+      },
+      "SdkAnalysisLevel": "9.0.100"
+    },
+    "frameworks": {
+      "netstandard2.1": {
+        "targetAlias": "netstandard2.1",
+        "imports": [
+          "net461",
+          "net462",
+          "net47",
+          "net471",
+          "net472",
+          "net48",
+          "net481"
+        ],
+        "assetTargetFallback": true,
+        "warn": true,
+        "frameworkReferences": {
+          "NETStandard.Library": {
+            "privateAssets": "all"
+          }
+        },
+        "runtimeIdentifierGraphPath": "/Users/norman/.dotnet/sdk/9.0.100/RuntimeIdentifierGraph.json"
+      }
+    }
+  }
+}

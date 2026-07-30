@@ -1,0 +1,11 @@
+{
+    "schema_version": 2,
+    "commit": "",
+    "indexed_at": "2026-07-29T02:20:41Z",
+    "project": "GpuParticle",
+    "nodes": 655,
+    "edges": 1232,
+    "original_size": 1638400,
+    "compressed_size": 85801,
+    "compression_level": 9
+}

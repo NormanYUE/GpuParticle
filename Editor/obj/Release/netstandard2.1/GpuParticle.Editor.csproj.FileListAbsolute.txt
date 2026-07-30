@@ -1,0 +1,13 @@
+/Users/norman/Documents/RiderProjects/GpuParticle/Editor/obj/Release/netstandard2.1/GpuParticle.Editor.csproj.AssemblyReference.cache
+/Users/norman/Documents/RiderProjects/GpuParticle/Editor/obj/Release/netstandard2.1/GpuParticle.Editor.GeneratedMSBuildEditorConfig.editorconfig
+/Users/norman/Documents/RiderProjects/GpuParticle/Editor/obj/Release/netstandard2.1/GpuParticle.Editor.AssemblyInfoInputs.cache
+/Users/norman/Documents/RiderProjects/GpuParticle/Editor/obj/Release/netstandard2.1/GpuParticle.Editor.AssemblyInfo.cs
+/Users/norman/Documents/RiderProjects/GpuParticle/Editor/obj/Release/netstandard2.1/GpuParticle.Editor.csproj.CoreCompileInputs.cache
+/Users/norman/Documents/RiderProjects/GpuParticle/Editor/bin/Release/netstandard2.1/GpuParticle.Editor.deps.json
+/Users/norman/Documents/RiderProjects/GpuParticle/Editor/bin/Release/netstandard2.1/GpuParticle.Editor.dll
+/Users/norman/Documents/RiderProjects/GpuParticle/Editor/bin/Release/netstandard2.1/GpuParticle.Editor.pdb
+/Users/norman/Documents/RiderProjects/GpuParticle/Editor/bin/Release/netstandard2.1/GpuParticle.Runtime.dll
+/Users/norman/Documents/RiderProjects/GpuParticle/Editor/bin/Release/netstandard2.1/GpuParticle.Runtime.pdb
+/Users/norman/Documents/RiderProjects/GpuParticle/Editor/obj/Release/netstandard2.1/GpuParti.D1B4303D.Up2Date
+/Users/norman/Documents/RiderProjects/GpuParticle/Editor/obj/Release/netstandard2.1/GpuParticle.Editor.dll
+/Users/norman/Documents/RiderProjects/GpuParticle/Editor/obj/Release/netstandard2.1/GpuParticle.Editor.pdb
