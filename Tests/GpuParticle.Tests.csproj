@@ -9,5 +9,9 @@
   <ItemGroup>
     <ProjectReference Include="../Runtime/GpuParticle.Runtime.csproj" />
     <ProjectReference Include="../Editor/GpuParticle.Editor.csproj" />
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(UnityEngineManaged)/UnityEngine.CoreModule.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
   </ItemGroup>
 </Project>

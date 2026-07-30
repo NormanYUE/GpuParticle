@@ -11,15 +11,15 @@ namespace GpuParticle.Tests
         {
             Run("valid blob header parses", ValidBlobHeaderParses);
             Run("crc mismatch is rejected", CrcMismatchIsRejected);
-            Run("track count must match section count", TrackCountMustMatchSectionCount);
             Run("file content hash changes with file bytes", FileContentHashChangesWithFileBytes);
+            BlobRoundtripTests.RunAll();
             Console.WriteLine("All tests passed.");
             return 0;
         }
 
         private static void ValidBlobHeaderParses()
         {
-            byte[] bytes = GpuParticleBlobTestData.CreateBlob(trackCount: 2, sectionCount: 2);
+            byte[] bytes = GpuParticleBlobTestData.CreateBlob(sectionCount: 2);
 
             if (!GpuParticleBlobReader.TryRead(bytes, out GpuParticleBlob blob, out GpuParticleFailure failure))
             {
@@ -27,15 +27,15 @@ namespace GpuParticle.Tests
             }
 
             AssertEqual(GpuParticleBlobFormat.SchemaVersion, blob.Header.SchemaVersion, "schema");
-            AssertEqual(2, blob.Header.TrackCount, "track count");
+            AssertEqual(2, blob.Header.TrackCount, "section count");
             AssertEqual(2, blob.Sections.Length, "section count");
-            AssertEqual(32, blob.Sections[0].Offset, "section offset");
+            AssertEqual(64, blob.Sections[0].Offset, "section offset");
             AssertEqual(16, blob.Sections[0].Length, "section length");
         }
 
         private static void CrcMismatchIsRejected()
         {
-            byte[] bytes = GpuParticleBlobTestData.CreateBlob(trackCount: 1, sectionCount: 0);
+            byte[] bytes = GpuParticleBlobTestData.CreateBlob(sectionCount: 0);
             bytes[20] ^= 0x7F;
 
             if (GpuParticleBlobReader.TryRead(bytes, out _, out GpuParticleFailure failure))
@@ -44,18 +44,6 @@ namespace GpuParticle.Tests
             }
 
             AssertEqual(GpuParticleFailureCode.PayloadCrcMismatch, failure.Code, "failure code");
-        }
-
-        private static void TrackCountMustMatchSectionCount()
-        {
-            byte[] bytes = GpuParticleBlobTestData.CreateBlob(trackCount: 2, sectionCount: 1);
-
-            if (GpuParticleBlobReader.TryRead(bytes, out _, out GpuParticleFailure failure))
-            {
-                throw new Exception("Expected track/section count mismatch to be rejected.");
-            }
-
-            AssertEqual(GpuParticleFailureCode.PayloadSectionTableInvalid, failure.Code, "failure code");
         }
 
         private static void FileContentHashChangesWithFileBytes()

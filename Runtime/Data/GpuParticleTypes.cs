@@ -85,6 +85,33 @@ namespace GpuParticle.Runtime
         }
     }
 
+    public struct GpuParticleBlobParticleState
+    {
+        public Vector3 Position;
+        public Vector3 Velocity;
+        public float Size;
+        public Vector4 Rotation;
+        public Color32 Color;
+        public float Lifetime;
+        public uint Seed;
+    }
+
+    public struct GpuParticleBlobTrailState
+    {
+        public Vector3 Position;
+        public float Width;
+        public Color32 Color;
+        public uint ParticleId;
+    }
+
+    public struct GpuParticleBlobMeshTransform
+    {
+        public Vector3 Position;
+        public Quaternion Rotation;
+        public Vector3 Scale;
+        public Color32 Color;
+    }
+
     public enum GpuParticleStartResult : byte
     {
         GpuStarted = 0,

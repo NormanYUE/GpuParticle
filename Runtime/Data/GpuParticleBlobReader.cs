@@ -3,76 +3,6 @@ using System.Buffers.Binary;
 
 namespace GpuParticle.Runtime
 {
-    public static class GpuParticleBlobFormat
-    {
-        public const uint Magic = 0x50474C48;
-        public const int SchemaVersion = 1;
-        public const int HeaderSize = 32;
-        public const int SectionRecordSize = 16;
-        public const int TrackSectionSize = 16;
-        public const int CrcOffset = 12;
-        public const int CrcSize = 4;
-    }
-
-    public readonly struct GpuParticleBlobHeader
-    {
-        public GpuParticleBlobHeader(
-            int schemaVersion,
-            int totalLength,
-            uint crc32,
-            float sampleRate,
-            float duration,
-            int trackCount,
-            int sectionTableOffset)
-        {
-            SchemaVersion = schemaVersion;
-            TotalLength = totalLength;
-            Crc32 = crc32;
-            SampleRate = sampleRate;
-            Duration = duration;
-            TrackCount = trackCount;
-            SectionTableOffset = sectionTableOffset;
-        }
-
-        public int SchemaVersion { get; }
-        public int TotalLength { get; }
-        public uint Crc32 { get; }
-        public float SampleRate { get; }
-        public float Duration { get; }
-        public int TrackCount { get; }
-        public int SectionTableOffset { get; }
-    }
-
-    public readonly struct GpuParticleBlobSection
-    {
-        public GpuParticleBlobSection(int offset, int length, int type, int flags)
-        {
-            Offset = offset;
-            Length = length;
-            Type = type;
-            Flags = flags;
-        }
-
-        public int Offset { get; }
-        public int Length { get; }
-        public int Type { get; }
-        public int Flags { get; }
-    }
-
-    public sealed class GpuParticleBlob
-    {
-        public GpuParticleBlob(byte[] bytes, GpuParticleBlobHeader header, GpuParticleBlobSection[] sections)
-        {
-            Bytes = bytes;
-            Header = header;
-            Sections = sections;
-        }
-
-        public byte[] Bytes { get; }
-        public GpuParticleBlobHeader Header { get; }
-        public GpuParticleBlobSection[] Sections { get; }
-    }
-
     public static class GpuParticleBlobReader
     {
         public static bool TryRead(byte[]? bytes, out GpuParticleBlob blob, out GpuParticleFailure failure)
@@ -130,14 +60,14 @@ namespace GpuParticle.Runtime
 
             float sampleRate = ReadSingleLittleEndian(span.Slice(16, 4));
             float duration = ReadSingleLittleEndian(span.Slice(20, 4));
-            int trackCount = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(24, 4));
+            int sectionCount = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(24, 4));
             int sectionTableOffset = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(28, 4));
 
-            if (sampleRate <= 0f || float.IsNaN(sampleRate) || duration < 0f || float.IsNaN(duration) || trackCount < 0)
+            if (sampleRate <= 0f || float.IsNaN(sampleRate) || duration < 0f || float.IsNaN(duration) || sectionCount < 0)
             {
                 failure = new GpuParticleFailure(
                     GpuParticleFailureCode.PayloadSectionTableInvalid,
-                    "Payload header contains invalid timing or track values.");
+                    "Payload header contains invalid timing or section values.");
                 return false;
             }
 
@@ -151,21 +81,12 @@ namespace GpuParticle.Runtime
                 return false;
             }
 
-            int remaining = totalLength - sectionTableOffset;
-            if (remaining % GpuParticleBlobFormat.SectionRecordSize != 0)
+            int sectionTableEnd = sectionTableOffset + sectionCount * GpuParticleBlobFormat.SectionRecordSize;
+            if (sectionTableEnd > totalLength || sectionTableEnd % 16 != 0)
             {
                 failure = new GpuParticleFailure(
                     GpuParticleFailureCode.PayloadSectionTableInvalid,
                     "Payload section table length is invalid.");
-                return false;
-            }
-
-            int sectionCount = remaining / GpuParticleBlobFormat.SectionRecordSize;
-            if (sectionCount != trackCount)
-            {
-                failure = new GpuParticleFailure(
-                    GpuParticleFailureCode.PayloadSectionTableInvalid,
-                    $"Payload track count {trackCount} does not match section count {sectionCount}.");
                 return false;
             }
 
@@ -203,7 +124,7 @@ namespace GpuParticle.Runtime
                 storedCrc,
                 sampleRate,
                 duration,
-                trackCount,
+                sectionCount,
                 sectionTableOffset);
             blob = new GpuParticleBlob(bytes, header, sections);
             failure = GpuParticleFailure.None;
