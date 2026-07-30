@@ -71,6 +71,7 @@ namespace GpuParticle.Editor
             }
 
             PrepareSystems(systems);
+            GpuParticleStateCollector stateCollector = new GpuParticleStateCollector();
             GpuParticleGeometryTrack[] tracks = CaptureGeometryTracks(
                 instance,
                 systems,
@@ -78,6 +79,7 @@ namespace GpuParticle.Editor
                 previewScene.Camera,
                 settings.SampleRate,
                 duration,
+                stateCollector,
                 report);
 
             if (report.HasFailure || tracks.Length == 0)
@@ -89,7 +91,7 @@ namespace GpuParticle.Editor
             }
 
             Bounds bounds = CalculateBounds(tracks);
-            GpuParticleClip clip = WriteClipAsset(prefab, settings, duration, loop, bounds, tracks);
+            GpuParticleClip clip = WriteClipAsset(prefab, settings, duration, loop, bounds, tracks, stateCollector);
             GpuParticleBindingWriter.WriteBinding(prefab, GpuParticleBakeStatus.GpuReady, clip, string.Empty);
             return new GpuParticleValidationResult(prefabPath, GpuParticleBakeStatus.GpuReady, GpuParticleFailure.None, clip);
         }
@@ -251,6 +253,7 @@ namespace GpuParticle.Editor
             Camera camera,
             float sampleRate,
             float duration,
+            GpuParticleStateCollector stateCollector,
             GpuParticleBakeReport report)
         {
             int frameCount = Mathf.CeilToInt(duration * sampleRate) + 1;
@@ -267,17 +270,9 @@ namespace GpuParticle.Editor
                     continue;
                 }
 
-                bool requiresCameraConstraint =
-                    renderer.renderMode == ParticleSystemRenderMode.Billboard ||
-                    renderer.renderMode == ParticleSystemRenderMode.Stretch ||
-                    renderer.alignment == ParticleSystemRenderSpace.View ||
-                    renderer.alignment == ParticleSystemRenderSpace.Facing;
-
-                GpuParticleRendererRecipe rendererRecipe = BuildRendererRecipe(
-                    root.transform,
-                    renderer,
-                    camera,
-                    requiresCameraConstraint);
+                GpuParticleRenderMode renderMode = MapRenderMode(renderer);
+                GpuParticleAlignment alignment = MapAlignment(renderer);
+                GpuParticleRendererRecipe rendererRecipe = BuildRendererRecipe(root.transform, renderer);
                 GpuParticleMaterialRecipe[] materialRecipes = BuildMaterialRecipes(renderer);
                 GpuParticleMaterialRecipe[] trailMaterialRecipes = BuildTrailMaterialRecipes(renderer);
                 if (materialRecipes.Length == 0)
@@ -286,43 +281,56 @@ namespace GpuParticle.Editor
                     return Array.Empty<GpuParticleGeometryTrack>();
                 }
 
+                ParticleSystem system = renderer.GetComponent<ParticleSystem>();
+                Mesh sharedMesh = renderMode == GpuParticleRenderMode.Mesh ? renderer.mesh : null!;
                 List<GpuParticleGeometryFrame> frames = new List<GpuParticleGeometryFrame>(frameCount);
                 bool visible = false;
+                Dictionary<uint, List<GpuParticleBlobTrailState>> trailHistory = new Dictionary<uint, List<GpuParticleBlobTrailState>>();
                 ResetAndPlay(rootSystems);
                 for (int frame = 0; frame < frameCount; frame++)
                 {
                     float time = frame * dt;
-                    Mesh mesh = new Mesh { name = $"{renderer.name}_F{frame:0000}" };
-                    Mesh trailMesh = new Mesh { name = $"{renderer.name}_Trail_F{frame:0000}" };
+                    Bounds bounds = new Bounds(Vector3.zero, Vector3.zero);
+                    bool hasBounds = false;
 
-                    try
-                    {
-#pragma warning disable 0618
-                        renderer.BakeMesh(mesh, camera, true);
-                        ParticleSystem system = renderer.GetComponent<ParticleSystem>();
-                        if (system != null && system.trails.enabled)
-                        {
-                            renderer.BakeTrailsMesh(trailMesh, camera, true);
-                        }
-#pragma warning restore 0618
-                    }
-                    catch (Exception ex)
-                    {
-                        UnityEngine.Object.DestroyImmediate(mesh);
-                        UnityEngine.Object.DestroyImmediate(trailMesh);
-                        report.Fail(GpuParticleFailureCode.RuntimeGpuFailure, ex.Message, GetTransformPath(renderer.transform));
-                        return Array.Empty<GpuParticleGeometryTrack>();
-                    }
+                    int particleStateOffset = 0;
+                    int particleCount = 0;
+                    int meshTransformOffset = 0;
+                    int meshTransformCount = 0;
+                    int trailStateOffset = 0;
+                    int trailCount = 0;
 
-                    Bounds bounds = mesh != null && mesh.vertexCount > 0 ? mesh.bounds : new Bounds(Vector3.zero, Vector3.zero);
-                    if (trailMesh != null && trailMesh.vertexCount > 0)
+                    if (renderMode == GpuParticleRenderMode.Mesh)
                     {
-                        bounds.Encapsulate(trailMesh.bounds);
+                        GpuParticleBlobMeshTransform[] transforms = CaptureMeshTransforms(system, renderer, ref bounds, ref hasBounds);
+                        meshTransformOffset = stateCollector.AppendMeshTransforms(transforms);
+                        meshTransformCount = transforms.Length;
+                    }
+                    else
+                    {
+                        GpuParticleBlobParticleState[] states = CaptureParticleStates(system, renderer, renderMode, ref bounds, ref hasBounds);
+                        particleStateOffset = stateCollector.AppendParticleStates(states);
+                        particleCount = states.Length;
                     }
 
-                    visible |= (mesh != null && mesh.vertexCount > 0) || (trailMesh != null && trailMesh.vertexCount > 0);
+                    if (system != null && system.trails.enabled)
+                    {
+                        GpuParticleBlobTrailState[] trails = CaptureTrailStates(system, renderer, trailHistory, ref bounds, ref hasBounds);
+                        trailStateOffset = stateCollector.AppendTrailStates(trails);
+                        trailCount = trails.Length;
+                    }
+
+                    visible |= hasBounds;
                     GpuParticleGeometryFrame geometryFrame = new GpuParticleGeometryFrame();
-                    geometryFrame.Configure(time, mesh, trailMesh, bounds);
+                    geometryFrame.Configure(
+                        time,
+                        particleCount,
+                        particleStateOffset,
+                        meshTransformCount,
+                        meshTransformOffset,
+                        trailCount,
+                        trailStateOffset,
+                        hasBounds ? bounds : new Bounds(Vector3.zero, Vector3.zero));
                     frames.Add(geometryFrame);
 
                     for (int systemIndex = 0; systemIndex < rootSystems.Length; systemIndex++)
@@ -339,14 +347,217 @@ namespace GpuParticle.Editor
                 GpuParticleGeometryTrack track = new GpuParticleGeometryTrack();
                 track.Configure(
                     GetTransformPath(root.transform, renderer.transform),
+                    renderMode,
+                    alignment,
                     rendererRecipe,
                     materialRecipes,
                     trailMaterialRecipes.Length > 0 ? trailMaterialRecipes : materialRecipes,
-                    frames.ToArray());
+                    sharedMesh,
+                    frames.ToArray(),
+                    CalculateTrackBounds(frames));
                 tracks.Add(track);
             }
 
             return tracks.ToArray();
+        }
+
+        private static GpuParticleRenderMode MapRenderMode(ParticleSystemRenderer renderer)
+        {
+            return renderer.renderMode switch
+            {
+                ParticleSystemRenderMode.Billboard => GpuParticleRenderMode.Billboard,
+                ParticleSystemRenderMode.Stretch => GpuParticleRenderMode.StretchedBillboard,
+                ParticleSystemRenderMode.Mesh => GpuParticleRenderMode.Mesh,
+                _ => GpuParticleRenderMode.Billboard,
+            };
+        }
+
+        private static GpuParticleAlignment MapAlignment(ParticleSystemRenderer renderer)
+        {
+            return renderer.alignment switch
+            {
+                ParticleSystemRenderSpace.View => GpuParticleAlignment.View,
+                ParticleSystemRenderSpace.Facing => GpuParticleAlignment.Facing,
+                ParticleSystemRenderSpace.World => GpuParticleAlignment.World,
+                ParticleSystemRenderSpace.Local => GpuParticleAlignment.Local,
+                _ => GpuParticleAlignment.View,
+            };
+        }
+
+        private static GpuParticleBlobParticleState[] CaptureParticleStates(
+            ParticleSystem system,
+            ParticleSystemRenderer renderer,
+            GpuParticleRenderMode renderMode,
+            ref Bounds bounds,
+            ref bool hasBounds)
+        {
+            if (system == null)
+            {
+                return Array.Empty<GpuParticleBlobParticleState>();
+            }
+
+            int maxParticles = system.main.maxParticles;
+            var particles = new ParticleSystem.Particle[maxParticles];
+            int count = system.GetParticles(particles);
+
+            var states = new GpuParticleBlobParticleState[count];
+            for (int i = 0; i < count; i++)
+            {
+                ParticleSystem.Particle p = particles[i];
+                states[i] = new GpuParticleBlobParticleState
+                {
+                    Position = p.position,
+                    Velocity = p.velocity,
+                    Size = renderMode == GpuParticleRenderMode.StretchedBillboard
+                        ? p.GetCurrentSize3D(renderer).x
+                        : p.GetCurrentSize3D(renderer).x,
+                    Rotation = new Vector4(p.rotation3D.x, p.rotation3D.y, p.rotation3D.z, 1f),
+                    Color = p.GetCurrentColor(system),
+                    Lifetime = 1f - p.remainingLifetime / Mathf.Max(p.startLifetime, 0.0001f),
+                    Seed = p.randomSeed,
+                };
+
+                Vector3 size = Vector3.one * states[i].Size;
+                Bounds particleBounds = new Bounds(states[i].Position, size);
+                if (hasBounds)
+                {
+                    bounds.Encapsulate(particleBounds);
+                }
+                else
+                {
+                    bounds = particleBounds;
+                    hasBounds = true;
+                }
+            }
+
+            return states;
+        }
+
+        private static GpuParticleBlobMeshTransform[] CaptureMeshTransforms(
+            ParticleSystem system,
+            ParticleSystemRenderer renderer,
+            ref Bounds bounds,
+            ref bool hasBounds)
+        {
+            if (system == null)
+            {
+                return Array.Empty<GpuParticleBlobMeshTransform>();
+            }
+
+            int maxParticles = system.main.maxParticles;
+            var particles = new ParticleSystem.Particle[maxParticles];
+            int count = system.GetParticles(particles);
+
+            var transforms = new GpuParticleBlobMeshTransform[count];
+            for (int i = 0; i < count; i++)
+            {
+                ParticleSystem.Particle p = particles[i];
+                transforms[i] = new GpuParticleBlobMeshTransform
+                {
+                    Position = p.position,
+                    Rotation = Quaternion.Euler(p.rotation3D),
+                    Scale = Vector3.one * p.GetCurrentSize3D(renderer).x,
+                    Color = p.GetCurrentColor(system),
+                };
+
+                Bounds transformBounds = new Bounds(transforms[i].Position, transforms[i].Scale);
+                if (hasBounds)
+                {
+                    bounds.Encapsulate(transformBounds);
+                }
+                else
+                {
+                    bounds = transformBounds;
+                    hasBounds = true;
+                }
+            }
+
+            return transforms;
+        }
+
+        private static GpuParticleBlobTrailState[] CaptureTrailStates(
+            ParticleSystem system,
+            ParticleSystemRenderer renderer,
+            Dictionary<uint, List<GpuParticleBlobTrailState>> history,
+            ref Bounds bounds,
+            ref bool hasBounds)
+        {
+            if (system == null || !system.trails.enabled)
+            {
+                return Array.Empty<GpuParticleBlobTrailState>();
+            }
+
+            int maxParticles = system.main.maxParticles;
+            var particles = new ParticleSystem.Particle[maxParticles];
+            int count = system.GetParticles(particles);
+
+            var result = new List<GpuParticleBlobTrailState>();
+            for (int i = 0; i < count; i++)
+            {
+                uint id = particles[i].randomSeed;
+                if (!history.TryGetValue(id, out var points))
+                {
+                    points = new List<GpuParticleBlobTrailState>();
+                    history[id] = points;
+                }
+
+                points.Insert(0, new GpuParticleBlobTrailState
+                {
+                    Position = particles[i].position,
+                    Width = system.trails.widthOverTrail.Evaluate(0f),
+                    Color = particles[i].GetCurrentColor(system),
+                    ParticleId = id,
+                });
+
+                int maxHistory = Mathf.CeilToInt(system.trails.lifetime * 120f) + 2;
+                while (points.Count > maxHistory)
+                {
+                    points.RemoveAt(points.Count - 1);
+                }
+
+                for (int p = 0; p < points.Count; p++)
+                {
+                    result.Add(points[p]);
+                    Bounds pointBounds = new Bounds(points[p].Position, Vector3.one * points[p].Width);
+                    if (hasBounds)
+                    {
+                        bounds.Encapsulate(pointBounds);
+                    }
+                    else
+                    {
+                        bounds = pointBounds;
+                        hasBounds = true;
+                    }
+                }
+            }
+
+            return result.ToArray();
+        }
+
+        private static Bounds CalculateTrackBounds(List<GpuParticleGeometryFrame> frames)
+        {
+            bool hasBounds = false;
+            Bounds bounds = new Bounds(Vector3.zero, Vector3.zero);
+            for (int i = 0; i < frames.Count; i++)
+            {
+                Bounds frameBounds = frames[i].FrameLocalBounds;
+                if (frameBounds.size.sqrMagnitude <= 0f)
+                {
+                    continue;
+                }
+
+                if (!hasBounds)
+                {
+                    bounds = frameBounds;
+                    hasBounds = true;
+                }
+                else
+                {
+                    bounds.Encapsulate(frameBounds);
+                }
+            }
+
+            return bounds;
         }
 
         private static ParticleSystemRenderer[] SortRenderersForPlayback(
@@ -443,11 +654,7 @@ namespace GpuParticle.Editor
             }
         }
 
-        private static GpuParticleRendererRecipe BuildRendererRecipe(
-            Transform root,
-            ParticleSystemRenderer renderer,
-            Camera camera,
-            bool requiresCameraConstraint)
+        private static GpuParticleRendererRecipe BuildRendererRecipe(Transform root, ParticleSystemRenderer renderer)
         {
             int queue = 3000;
             Material material = renderer.sharedMaterial;
@@ -466,11 +673,6 @@ namespace GpuParticle.Editor
                 queue,
                 renderer.shadowCastingMode,
                 renderer.receiveShadows);
-            if (requiresCameraConstraint)
-            {
-                recipe.SetCameraConstraint(camera);
-            }
-
             return recipe;
         }
 
@@ -535,23 +737,20 @@ namespace GpuParticle.Editor
             Bounds bounds = new Bounds(Vector3.zero, Vector3.zero);
             for (int t = 0; t < tracks.Length; t++)
             {
-                GpuParticleGeometryFrame[] frames = tracks[t].Frames;
-                for (int f = 0; f < frames.Length; f++)
+                Bounds trackBounds = tracks[t].LocalBounds;
+                if (trackBounds.size.sqrMagnitude <= 0f)
                 {
-                    if (!frames[f].HasVisibleMesh)
-                    {
-                        continue;
-                    }
+                    continue;
+                }
 
-                    if (!hasBounds)
-                    {
-                        bounds = frames[f].Bounds;
-                        hasBounds = true;
-                    }
-                    else
-                    {
-                        bounds.Encapsulate(frames[f].Bounds);
-                    }
+                if (!hasBounds)
+                {
+                    bounds = trackBounds;
+                    hasBounds = true;
+                }
+                else
+                {
+                    bounds.Encapsulate(trackBounds);
                 }
             }
 
@@ -564,7 +763,8 @@ namespace GpuParticle.Editor
             float duration,
             bool loop,
             Bounds bounds,
-            GpuParticleGeometryTrack[] tracks)
+            GpuParticleGeometryTrack[] tracks,
+            GpuParticleStateCollector stateCollector)
         {
             string prefabPath = AssetDatabase.GetAssetPath(prefab);
             string prefabGuid = AssetDatabase.AssetPathToGUID(prefabPath);
@@ -574,7 +774,7 @@ namespace GpuParticle.Editor
             string clipPath = $"{folder}/{prefab.name}.gpuparticle.asset";
             string payloadPath = $"{folder}/{prefab.name}.gpuparticle.bytes";
 
-            byte[] payloadBytes = GpuParticleBlobWriter.CreateHeaderOnlyBlob(settings.SampleRate, duration, tracks.Length);
+            byte[] payloadBytes = stateCollector.CreateBlob(settings.SampleRate, duration, tracks.Length);
             File.WriteAllBytes(payloadPath, payloadBytes);
             AssetDatabase.ImportAsset(payloadPath, ImportAssetOptions.ForceSynchronousImport);
             TextAsset payload = AssetDatabase.LoadAssetAtPath<TextAsset>(payloadPath);
@@ -586,7 +786,6 @@ namespace GpuParticle.Editor
 
             GpuParticleClip clip = ScriptableObject.CreateInstance<GpuParticleClip>();
             AssetDatabase.CreateAsset(clip, clipPath);
-            AddMeshesToAsset(clip, tracks);
             clip.Configure(
                 prefabGuid,
                 GpuParticleSourceHasher.ComputePrefabHash(prefab),
@@ -596,7 +795,7 @@ namespace GpuParticle.Editor
                 settings.SampleRate,
                 loop,
                 bounds,
-                GpuParticleCapability.GeometryPlayback,
+                GpuParticleCapability.ComputePlayback,
                 payload,
                 null,
                 tracks);
@@ -605,28 +804,6 @@ namespace GpuParticle.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.ImportAsset(clipPath, ImportAssetOptions.ForceSynchronousImport);
             return AssetDatabase.LoadAssetAtPath<GpuParticleClip>(clipPath);
-        }
-
-        private static void AddMeshesToAsset(GpuParticleClip clip, GpuParticleGeometryTrack[] tracks)
-        {
-            for (int t = 0; t < tracks.Length; t++)
-            {
-                GpuParticleGeometryFrame[] frames = tracks[t].Frames;
-                for (int f = 0; f < frames.Length; f++)
-                {
-                    Mesh mesh = frames[f].Mesh;
-                    if (mesh != null)
-                    {
-                        AssetDatabase.AddObjectToAsset(mesh, clip);
-                    }
-
-                    Mesh trailMesh = frames[f].TrailMesh;
-                    if (trailMesh != null)
-                    {
-                        AssetDatabase.AddObjectToAsset(trailMesh, clip);
-                    }
-                }
-            }
         }
 
         private static string GetTransformPath(Transform transform)
