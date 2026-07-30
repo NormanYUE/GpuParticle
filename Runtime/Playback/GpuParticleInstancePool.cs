@@ -197,6 +197,10 @@ namespace GpuParticle.Runtime
             public bool Paused;
             public uint SeedVariant;
             public uint Generation;
+
+            public ComputeBuffer ParticleStateBuffer;
+            public ComputeBuffer TrailStateBuffer;
+            public ComputeBuffer MeshTransformBuffer;
         }
     }
 }
