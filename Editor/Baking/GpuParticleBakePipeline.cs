@@ -76,7 +76,6 @@ namespace GpuParticle.Editor
                 instance,
                 systems,
                 renderers,
-                previewScene.Camera,
                 settings.SampleRate,
                 duration,
                 stateCollector,
@@ -250,7 +249,6 @@ namespace GpuParticle.Editor
             GameObject root,
             ParticleSystem[] systems,
             ParticleSystemRenderer[] renderers,
-            Camera camera,
             float sampleRate,
             float duration,
             GpuParticleStateCollector stateCollector,
@@ -408,9 +406,7 @@ namespace GpuParticle.Editor
                 {
                     Position = p.position,
                     Velocity = p.velocity,
-                    Size = renderMode == GpuParticleRenderMode.StretchedBillboard
-                        ? p.GetCurrentSize3D(renderer).x
-                        : p.GetCurrentSize3D(renderer).x,
+                    Size = p.GetCurrentSize3D(renderer).x,
                     Rotation = new Vector4(p.rotation3D.x, p.rotation3D.y, p.rotation3D.z, 1f),
                     Color = p.GetCurrentColor(system),
                     Lifetime = 1f - p.remainingLifetime / Mathf.Max(p.startLifetime, 0.0001f),
