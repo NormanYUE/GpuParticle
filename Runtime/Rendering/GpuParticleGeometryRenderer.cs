@@ -6,6 +6,12 @@ namespace GpuParticle.Runtime
 {
     internal static class GpuParticleGeometryRenderer
     {
+        private static readonly int ParticleStatesId = Shader.PropertyToID("_ParticleStates");
+        private static readonly int MeshTransformsId = Shader.PropertyToID("_MeshTransforms");
+        private static readonly int LocalToWorldId = Shader.PropertyToID("_LocalToWorld");
+        private static readonly int CameraRightId = Shader.PropertyToID("_CameraRight");
+        private static readonly int CameraUpId = Shader.PropertyToID("_CameraUp");
+
         public static void Render(ArraySegment<GpuParticleInstancePool.Instance> instances, Camera camera)
         {
             if (camera == null)
@@ -26,67 +32,121 @@ namespace GpuParticle.Runtime
             for (int t = 0; t < tracks.Length; t++)
             {
                 GpuParticleGeometryTrack track = tracks[t];
-                if (!track.RendererRecipe.IsCameraCompatible(camera))
+                switch (track.RenderMode)
                 {
-                    instance.Owner?.RequestNativeFallback(
-                        new GpuParticleFailure(
-                            GpuParticleFailureCode.CameraDependentGeometry,
-                            "Current camera does not match the baked camera profile.",
-                            track.TransformPath),
-                        instance.Elapsed,
-                        instance.SeedVariant,
-                        instance.TimeScale);
-                    return;
+                    case GpuParticleRenderMode.Billboard:
+                        RenderBillboard(track, instance, camera);
+                        break;
+                    case GpuParticleRenderMode.StretchedBillboard:
+                        RenderStretch(track, instance, camera);
+                        break;
+                    case GpuParticleRenderMode.Mesh:
+                        RenderMesh(track, instance, camera);
+                        break;
                 }
 
-                int frameIndex = track.FindFrameIndex(instance.Elapsed);
-                if (frameIndex < 0)
+                if (track.TrailMaterialRecipes.Length > 0)
                 {
-                    continue;
+                    RenderTrails(track, instance, camera);
                 }
-
-                GpuParticleGeometryFrame frame = track.Frames[frameIndex];
-                DrawMesh(frame.Mesh, track.MaterialRecipes, track, instance.LocalToWorld, camera);
-                DrawMesh(frame.TrailMesh, track.TrailMaterialRecipes, track, instance.LocalToWorld, camera);
             }
         }
 
-        private static void DrawMesh(
-            Mesh mesh,
-            GpuParticleMaterialRecipe[] materials,
-            GpuParticleGeometryTrack track,
-            Matrix4x4 matrix,
-            Camera camera)
+        private static void RenderBillboard(GpuParticleGeometryTrack track, GpuParticleInstancePool.Instance instance, Camera camera)
         {
-            if (mesh == null || mesh.vertexCount == 0)
+            var material = track.MaterialRecipes[0].Material;
+            if (material == null || instance.ParticleStateBuffer == null)
             {
                 return;
             }
 
-            int subMeshCount = Mathf.Max(1, mesh.subMeshCount);
-            for (int i = 0; i < materials.Length; i++)
-            {
-                GpuParticleMaterialRecipe materialRecipe = materials[i];
-                Material material = materialRecipe.Material;
-                if (material == null)
-                {
-                    continue;
-                }
+            material.SetBuffer(ParticleStatesId, instance.ParticleStateBuffer);
+            material.SetMatrix(LocalToWorldId, instance.LocalToWorld);
+            material.SetVector(CameraRightId, camera.transform.right);
+            material.SetVector(CameraUpId, camera.transform.up);
 
-                int subMesh = Mathf.Clamp(materialRecipe.SubMeshIndex, 0, subMeshCount - 1);
-                RenderParams renderParams = new RenderParams(material)
-                {
-                    camera = camera,
-                    layer = track.RendererRecipe.Layer,
-                    rendererPriority = track.RendererRecipe.RendererPriority,
-                    shadowCastingMode = track.RendererRecipe.ShadowCastingMode,
-                    receiveShadows = track.RendererRecipe.ReceiveShadows,
-                    lightProbeUsage = LightProbeUsage.Off,
-                    reflectionProbeUsage = ReflectionProbeUsage.Off,
-                    worldBounds = TransformBounds(mesh.bounds, matrix),
-                };
-                Graphics.RenderMesh(renderParams, mesh, subMesh, matrix);
+            var renderParams = new RenderParams(material)
+            {
+                camera = camera,
+                layer = track.RendererRecipe.Layer,
+                worldBounds = TransformBounds(track.LocalBounds, instance.LocalToWorld),
+            };
+
+            int count = instance.ParticleStateBuffer.count;
+            Graphics.RenderPrimitives(renderParams, MeshTopology.Triangles, 6, count);
+        }
+
+        private static void RenderStretch(GpuParticleGeometryTrack track, GpuParticleInstancePool.Instance instance, Camera camera)
+        {
+            var material = track.MaterialRecipes[0].Material;
+            if (material == null || instance.ParticleStateBuffer == null)
+            {
+                return;
             }
+
+            material.SetBuffer(ParticleStatesId, instance.ParticleStateBuffer);
+            material.SetMatrix(LocalToWorldId, instance.LocalToWorld);
+            material.SetVector(CameraRightId, camera.transform.right);
+            material.SetFloat(Shader.PropertyToID("_StretchScale"), 0.1f);
+
+            var renderParams = new RenderParams(material)
+            {
+                camera = camera,
+                layer = track.RendererRecipe.Layer,
+                worldBounds = TransformBounds(track.LocalBounds, instance.LocalToWorld),
+            };
+
+            int count = instance.ParticleStateBuffer.count;
+            Graphics.RenderPrimitives(renderParams, MeshTopology.Triangles, 6, count);
+        }
+
+        private static void RenderMesh(GpuParticleGeometryTrack track, GpuParticleInstancePool.Instance instance, Camera camera)
+        {
+            if (track.SharedMesh == null || instance.MeshTransformBuffer == null)
+            {
+                return;
+            }
+
+            var material = track.MaterialRecipes[0].Material;
+            if (material == null)
+            {
+                return;
+            }
+
+            material.SetBuffer(MeshTransformsId, instance.MeshTransformBuffer);
+            material.SetMatrix(LocalToWorldId, instance.LocalToWorld);
+
+            var renderParams = new RenderParams(material)
+            {
+                camera = camera,
+                layer = track.RendererRecipe.Layer,
+                worldBounds = TransformBounds(track.LocalBounds, instance.LocalToWorld),
+            };
+
+            int count = instance.MeshTransformBuffer.count;
+            Graphics.DrawMeshInstancedProcedural(track.SharedMesh, 0, material, renderParams.worldBounds, count);
+        }
+
+        private static void RenderTrails(GpuParticleGeometryTrack track, GpuParticleInstancePool.Instance instance, Camera camera)
+        {
+            var material = track.TrailMaterialRecipes[0].Material;
+            if (material == null || instance.TrailStateBuffer == null)
+            {
+                return;
+            }
+
+            material.SetBuffer(Shader.PropertyToID("_TrailStates"), instance.TrailStateBuffer);
+            material.SetMatrix(LocalToWorldId, instance.LocalToWorld);
+
+            var renderParams = new RenderParams(material)
+            {
+                camera = camera,
+                layer = track.RendererRecipe.Layer,
+                worldBounds = TransformBounds(track.LocalBounds, instance.LocalToWorld),
+            };
+
+            int count = instance.TrailStateBuffer.count;
+            Graphics.RenderPrimitives(renderParams, MeshTopology.Triangles, 6, count);
         }
 
         private static Bounds TransformBounds(Bounds localBounds, Matrix4x4 matrix)

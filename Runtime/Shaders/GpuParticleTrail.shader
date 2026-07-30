@@ -35,15 +35,29 @@ Shader "GpuParticle/Trail"
 
             v2f vert(uint id : SV_VertexID, uint instId : SV_InstanceID)
             {
-                // 简化：每个 trail 控制点扩展为 2 个顶点，id 为偶数/奇数决定左右偏移
+                // 每个 trail 控制点扩展为 6 个顶点（2 个三角形组成一个朝向相机的矩形）
                 TrailState t = _TrailStates[instId];
                 float3 center = mul(_LocalToWorld, float4(t.position, 1)).xyz;
-                float3 offset = (id % 2 == 0 ? -1 : 1) * float3(0, t.width * 0.5, 0);
+                float halfWidth = t.width * 0.5;
+
+                // 0: left-bottom, 1: right-bottom, 2: right-top
+                // 3: left-bottom, 4: right-top, 5: left-top
+                float2 uv;
+                float2 corner;
+                switch (id % 6)
+                {
+                    case 0: uv = float2(0, 0); corner = float2(-halfWidth, -halfWidth); break;
+                    case 1: uv = float2(1, 0); corner = float2(halfWidth, -halfWidth); break;
+                    case 2: uv = float2(1, 1); corner = float2(halfWidth, halfWidth); break;
+                    case 3: uv = float2(0, 0); corner = float2(-halfWidth, -halfWidth); break;
+                    case 4: uv = float2(1, 1); corner = float2(halfWidth, halfWidth); break;
+                    default: uv = float2(0, 1); corner = float2(-halfWidth, halfWidth); break;
+                }
 
                 v2f o;
-                o.vertex = mul(UNITY_MATRIX_VP, float4(center + offset, 1));
+                o.vertex = mul(UNITY_MATRIX_VP, float4(center + float3(corner.x, corner.y, 0), 1));
                 o.color = UnpackColor32(t.color);
-                o.uv = float2((float)(id % 2), (float)instId);
+                o.uv = uv;
                 return o;
             }
 
