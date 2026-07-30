@@ -4,32 +4,32 @@ namespace GpuParticle.Runtime
 {
     public sealed class GpuParticleRuntimeResources : ScriptableObject
     {
-        [SerializeField] private ComputeShader playbackCompute = null!;
         [SerializeField] private Shader billboardShader = null!;
         [SerializeField] private Shader meshShader = null!;
-        [SerializeField] private Mesh defaultQuad = null!;
+        [SerializeField] private Shader stretchShader = null!;
+        [SerializeField] private Shader trailShader = null!;
         [SerializeField] private ShaderVariantCollection shaderVariants = null!;
 
-        public ComputeShader PlaybackCompute => playbackCompute;
         public Shader BillboardShader => billboardShader;
         public Shader MeshShader => meshShader;
-        public Mesh DefaultQuad => defaultQuad;
+        public Shader StretchShader => stretchShader;
+        public Shader TrailShader => trailShader;
         public ShaderVariantCollection ShaderVariants => shaderVariants;
 
         public bool HasStatePlaybackResources =>
-            playbackCompute != null && billboardShader != null && meshShader != null && defaultQuad != null;
+            billboardShader != null && meshShader != null && stretchShader != null && trailShader != null;
 
         public void Configure(
-            ComputeShader compute,
             Shader billboard,
             Shader mesh,
-            Mesh quad,
+            Shader stretch,
+            Shader trail,
             ShaderVariantCollection variants)
         {
-            playbackCompute = compute;
             billboardShader = billboard;
             meshShader = mesh;
-            defaultQuad = quad;
+            stretchShader = stretch;
+            trailShader = trail;
             shaderVariants = variants;
         }
     }

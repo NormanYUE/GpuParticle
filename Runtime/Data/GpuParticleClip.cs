@@ -14,7 +14,7 @@ namespace GpuParticle.Runtime
         [SerializeField] private float sampleRate = 120f;
         [SerializeField] private bool loop;
         [SerializeField] private Bounds localBounds;
-        [SerializeField] private GpuParticleCapability requiredCapabilities = GpuParticleCapability.GeometryPlayback;
+        [SerializeField] private GpuParticleCapability requiredCapabilities = GpuParticleCapability.ComputePlayback;
         [SerializeField] private TextAsset payload = null!;
         [SerializeField] private GpuParticleRuntimeResources runtimeResources = null!;
         [SerializeField] private GpuParticleGeometryTrack[] geometryTracks = Array.Empty<GpuParticleGeometryTrack>();
@@ -82,17 +82,17 @@ namespace GpuParticle.Runtime
                 return false;
             }
 
-            if (geometryTracks == null || geometryTracks.Length == 0)
+            if (blob.Header.SchemaVersion != GpuParticleBlobFormat.SchemaVersion)
             {
-                failure = new GpuParticleFailure(GpuParticleFailureCode.MissingGeometry, "Clip has no playable geometry tracks.");
+                failure = new GpuParticleFailure(
+                    GpuParticleFailureCode.PayloadSchemaMismatch,
+                    $"Clip schema {blob.Header.SchemaVersion} does not match supported schema {GpuParticleBlobFormat.SchemaVersion}.");
                 return false;
             }
 
-            if (blob.Header.TrackCount != geometryTracks.Length)
+            if (geometryTracks == null || geometryTracks.Length == 0)
             {
-                failure = new GpuParticleFailure(
-                    GpuParticleFailureCode.PayloadSectionTableInvalid,
-                    $"Payload track count {blob.Header.TrackCount} does not match geometry track count {geometryTracks.Length}.");
+                failure = new GpuParticleFailure(GpuParticleFailureCode.MissingGeometry, "Clip has no playable geometry tracks.");
                 return false;
             }
 

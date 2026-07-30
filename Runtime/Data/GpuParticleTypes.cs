@@ -10,10 +10,19 @@ namespace GpuParticle.Runtime
         GpuReady = 1,
     }
 
-    internal enum GpuParticleTrackMode : byte
+    public enum GpuParticleRenderMode : byte
     {
-        State = 0,
-        Geometry = 1,
+        Billboard,
+        StretchedBillboard,
+        Mesh,
+    }
+
+    public enum GpuParticleAlignment : byte
+    {
+        View,
+        Facing,
+        World,
+        Local,
     }
 
     [Flags]
@@ -129,15 +138,6 @@ namespace GpuParticle.Runtime
         [SerializeField] private int renderQueue = 3000;
         [SerializeField] private ShadowCastingMode shadowCastingMode = ShadowCastingMode.Off;
         [SerializeField] private bool receiveShadows;
-        [SerializeField] private bool cameraConstrained;
-        [SerializeField] private Vector3 referenceCameraPosition;
-        [SerializeField] private Quaternion referenceCameraRotation = Quaternion.identity;
-        [SerializeField] private float referenceCameraFieldOfView;
-        [SerializeField] private float referenceCameraAspect;
-        [SerializeField] private float cameraPositionTolerance = 0.05f;
-        [SerializeField] private float cameraRotationTolerance = 0.5f;
-        [SerializeField] private float cameraFieldOfViewTolerance = 0.1f;
-        [SerializeField] private float cameraAspectTolerance = 0.01f;
 
         public string TransformPath => transformPath;
         public int Layer => layer;
@@ -147,7 +147,6 @@ namespace GpuParticle.Runtime
         public int RenderQueue => renderQueue;
         public ShadowCastingMode ShadowCastingMode => shadowCastingMode;
         public bool ReceiveShadows => receiveShadows;
-        public bool CameraConstrained => cameraConstrained;
 
         public void Configure(
             string path,
@@ -167,52 +166,6 @@ namespace GpuParticle.Runtime
             renderQueue = queue;
             shadowCastingMode = shadows;
             receiveShadows = receives;
-        }
-
-        public void SetCameraConstraint(
-            Camera camera,
-            float positionTolerance = 0.05f,
-            float rotationTolerance = 0.5f,
-            float fieldOfViewTolerance = 0.1f,
-            float aspectTolerance = 0.01f)
-        {
-            if (camera == null)
-            {
-                cameraConstrained = false;
-                return;
-            }
-
-            cameraConstrained = true;
-            referenceCameraPosition = camera.transform.position;
-            referenceCameraRotation = camera.transform.rotation;
-            referenceCameraFieldOfView = camera.fieldOfView;
-            referenceCameraAspect = camera.aspect;
-            cameraPositionTolerance = Mathf.Max(0f, positionTolerance);
-            cameraRotationTolerance = Mathf.Max(0f, rotationTolerance);
-            cameraFieldOfViewTolerance = Mathf.Max(0f, fieldOfViewTolerance);
-            cameraAspectTolerance = Mathf.Max(0f, aspectTolerance);
-        }
-
-        public bool IsCameraCompatible(Camera camera)
-        {
-            if (!cameraConstrained)
-            {
-                return true;
-            }
-
-            if (camera == null)
-            {
-                return false;
-            }
-
-            float positionDelta = Vector3.Distance(referenceCameraPosition, camera.transform.position);
-            float rotationDelta = Quaternion.Angle(referenceCameraRotation, camera.transform.rotation);
-            float fovDelta = Mathf.Abs(referenceCameraFieldOfView - camera.fieldOfView);
-            float aspectDelta = Mathf.Abs(referenceCameraAspect - camera.aspect);
-            return positionDelta <= cameraPositionTolerance &&
-                   rotationDelta <= cameraRotationTolerance &&
-                   fovDelta <= cameraFieldOfViewTolerance &&
-                   aspectDelta <= cameraAspectTolerance;
         }
     }
 
@@ -239,25 +192,41 @@ namespace GpuParticle.Runtime
     public sealed class GpuParticleGeometryFrame
     {
         [SerializeField] private float time;
-        [SerializeField] private Mesh mesh = null!;
-        [SerializeField] private Mesh trailMesh = null!;
-        [SerializeField] private Bounds bounds;
+        [SerializeField] private int particleCount;
+        [SerializeField] private int particleStateOffset;
+        [SerializeField] private int meshTransformCount;
+        [SerializeField] private int meshTransformOffset;
+        [SerializeField] private int trailCount;
+        [SerializeField] private int trailStateOffset;
+        [SerializeField] private Bounds frameLocalBounds;
 
         public float Time => time;
-        public Mesh Mesh => mesh;
-        public Mesh TrailMesh => trailMesh;
-        public Bounds Bounds => bounds;
+        public int ParticleCount => particleCount;
+        public int ParticleStateOffset => particleStateOffset;
+        public int MeshTransformCount => meshTransformCount;
+        public int MeshTransformOffset => meshTransformOffset;
+        public int TrailCount => trailCount;
+        public int TrailStateOffset => trailStateOffset;
+        public Bounds FrameLocalBounds => frameLocalBounds;
 
-        public bool HasVisibleMesh =>
-            (mesh != null && mesh.vertexCount > 0) ||
-            (trailMesh != null && trailMesh.vertexCount > 0);
-
-        public void Configure(float frameTime, Mesh? particleMesh, Mesh? particleTrailMesh, Bounds frameBounds)
+        public void Configure(
+            float frameTime,
+            int particleCountValue,
+            int particleStateOffsetValue,
+            int meshTransformCountValue,
+            int meshTransformOffsetValue,
+            int trailCountValue,
+            int trailStateOffsetValue,
+            Bounds bounds)
         {
             time = frameTime;
-            mesh = particleMesh == null ? null! : particleMesh;
-            trailMesh = particleTrailMesh == null ? null! : particleTrailMesh;
-            bounds = frameBounds;
+            particleCount = particleCountValue;
+            particleStateOffset = particleStateOffsetValue;
+            meshTransformCount = meshTransformCountValue;
+            meshTransformOffset = meshTransformOffsetValue;
+            trailCount = trailCountValue;
+            trailStateOffset = trailStateOffsetValue;
+            frameLocalBounds = bounds;
         }
     }
 
@@ -265,16 +234,24 @@ namespace GpuParticle.Runtime
     public sealed class GpuParticleGeometryTrack
     {
         [SerializeField] private string transformPath = string.Empty;
+        [SerializeField] private GpuParticleRenderMode renderMode = GpuParticleRenderMode.Billboard;
+        [SerializeField] private GpuParticleAlignment alignment = GpuParticleAlignment.View;
         [SerializeField] private GpuParticleRendererRecipe rendererRecipe = new GpuParticleRendererRecipe();
         [SerializeField] private GpuParticleMaterialRecipe[] materialRecipes = Array.Empty<GpuParticleMaterialRecipe>();
         [SerializeField] private GpuParticleMaterialRecipe[] trailMaterialRecipes = Array.Empty<GpuParticleMaterialRecipe>();
+        [SerializeField] private Mesh sharedMesh = null!;
         [SerializeField] private GpuParticleGeometryFrame[] frames = Array.Empty<GpuParticleGeometryFrame>();
+        [SerializeField] private Bounds localBounds;
 
         public string TransformPath => transformPath;
+        public GpuParticleRenderMode RenderMode => renderMode;
+        public GpuParticleAlignment Alignment => alignment;
         public GpuParticleRendererRecipe RendererRecipe => rendererRecipe;
         public GpuParticleMaterialRecipe[] MaterialRecipes => materialRecipes;
         public GpuParticleMaterialRecipe[] TrailMaterialRecipes => trailMaterialRecipes;
+        public Mesh SharedMesh => sharedMesh;
         public GpuParticleGeometryFrame[] Frames => frames;
+        public Bounds LocalBounds => localBounds;
 
         public int FindFrameIndex(float clipTime)
         {
@@ -303,16 +280,24 @@ namespace GpuParticle.Runtime
 
         public void Configure(
             string path,
+            GpuParticleRenderMode mode,
+            GpuParticleAlignment alignmentValue,
             GpuParticleRendererRecipe recipe,
             GpuParticleMaterialRecipe[] materials,
             GpuParticleMaterialRecipe[] trailMaterials,
-            GpuParticleGeometryFrame[] geometryFrames)
+            Mesh mesh,
+            GpuParticleGeometryFrame[] geometryFrames,
+            Bounds bounds)
         {
             transformPath = path ?? string.Empty;
+            renderMode = mode;
+            alignment = alignmentValue;
             rendererRecipe = recipe ?? new GpuParticleRendererRecipe();
             materialRecipes = materials ?? Array.Empty<GpuParticleMaterialRecipe>();
             trailMaterialRecipes = trailMaterials ?? Array.Empty<GpuParticleMaterialRecipe>();
+            sharedMesh = mesh == null ? null! : mesh;
             frames = geometryFrames ?? Array.Empty<GpuParticleGeometryFrame>();
+            localBounds = bounds;
         }
     }
 
