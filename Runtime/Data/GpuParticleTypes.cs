@@ -353,4 +353,32 @@ namespace GpuParticle.Runtime
             enabled = source != null && source.enabled;
         }
     }
+
+    public struct GpuParticleInstanceData
+    {
+        public Matrix4x4 LocalToWorld;
+        public float ElapsedTime;
+        public float TimeScale;
+        public uint SeedVariant;
+
+        public GpuParticleInstanceData(Matrix4x4 localToWorld, float elapsedTime, float timeScale, uint seedVariant)
+        {
+            LocalToWorld = localToWorld;
+            ElapsedTime = elapsedTime;
+            TimeScale = timeScale;
+            SeedVariant = seedVariant;
+        }
+    }
+
+    public struct GpuParticleInstanceSlot
+    {
+        public int Generation;
+        public GpuParticleClip Clip;
+        public Matrix4x4 LocalToWorld;
+        public float ElapsedTime;
+        public float TimeScale;
+        public uint SeedVariant;
+        public bool Loop;
+        public bool IsAlive;
+    }
 }
