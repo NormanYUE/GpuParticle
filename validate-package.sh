@@ -13,6 +13,9 @@ while IFS= read -r path; do
     ./*.meta|./Editor/*.meta|./Runtime/*.meta)
       continue
       ;;
+    *.pdb|*.pdb.meta)
+      continue
+      ;;
   esac
 
   if [ ! -e "$path.meta" ]; then
