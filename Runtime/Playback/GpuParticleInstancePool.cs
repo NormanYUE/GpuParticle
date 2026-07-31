@@ -29,7 +29,7 @@ namespace GpuParticle.Runtime
             uint seedVariant,
             bool loop)
         {
-            if (clip == null)
+            if (clip is null)
             {
                 throw new ArgumentNullException(nameof(clip));
             }
@@ -119,7 +119,7 @@ namespace GpuParticle.Runtime
             for (int i = 0; i < aliveCount; i++)
             {
                 ref GpuParticleInstanceSlot slot = ref slots[i];
-                if (!slot.IsAlive || slot.Clip == null)
+                if (!slot.IsAlive || slot.Clip is null)
                 {
                     continue;
                 }

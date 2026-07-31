@@ -14,6 +14,7 @@ namespace GpuParticle.Tests
             Run("file content hash changes with file bytes", FileContentHashChangesWithFileBytes);
             BlobRoundtripTests.RunAll();
             StateInterpolationTests.RunAll();
+            InstancingTests.RunAll();
             Console.WriteLine("All tests passed.");
             return 0;
         }

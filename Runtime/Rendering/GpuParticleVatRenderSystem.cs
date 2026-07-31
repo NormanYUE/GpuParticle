@@ -140,7 +140,7 @@ namespace GpuParticle.Runtime
             for (int i = 0; i < slots.Length; i++)
             {
                 GpuParticleInstanceSlot slot = slots[i];
-                if (slot.Clip == null)
+                if (slot.Clip is null)
                 {
                     continue;
                 }
@@ -197,14 +197,14 @@ namespace GpuParticle.Runtime
             public void Draw()
             {
                 int count = instanceData.Count;
-                if (count == 0 || clip.Prefab == null)
+                if (count == 0 || clip.Prefab is null)
                 {
                     return;
                 }
 
                 Mesh mesh = GetMesh();
                 Material mat = GetMaterial();
-                if (mesh == null || mat == null)
+                if (mesh is null || mat is null)
                 {
                     return;
                 }
@@ -233,21 +233,21 @@ namespace GpuParticle.Runtime
 
             private Mesh GetMesh()
             {
-                if (clip.Prefab == null)
+                if (clip.Prefab is null)
                 {
                     return null!;
                 }
 
                 MeshFilter? filter = clip.Prefab.GetComponentInChildren<MeshFilter>();
-                return filter != null ? filter.sharedMesh : null!;
+                return filter is not null ? filter.sharedMesh : null!;
             }
 
             private Material GetMaterial()
             {
-                if (material == null)
+                if (material is null)
                 {
                     MeshRenderer? renderer = clip.Prefab?.GetComponentInChildren<MeshRenderer>();
-                    if (renderer != null && renderer.sharedMaterial != null)
+                    if (renderer is not null && renderer.sharedMaterial is not null)
                     {
                         material = new Material(renderer.sharedMaterial);
                         material.enableInstancing = true;
@@ -288,7 +288,7 @@ namespace GpuParticle.Runtime
 
             private void EnsureBuffer(int count)
             {
-                if (instanceBuffer != null && instanceBuffer.count >= count)
+                if (instanceBuffer is not null && instanceBuffer.count >= count)
                 {
                     return;
                 }
@@ -305,7 +305,7 @@ namespace GpuParticle.Runtime
             {
                 instanceBuffer?.Dispose();
                 instanceBuffer = null;
-                if (material != null)
+                if (material is not null)
                 {
                     UnityEngine.Object.Destroy(material);
                     material = null;
