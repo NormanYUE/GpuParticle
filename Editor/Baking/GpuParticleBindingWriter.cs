@@ -13,6 +13,18 @@ namespace GpuParticle.Editor
             GpuParticleClip? clip,
             string failureCode)
         {
+            WriteBinding(prefab, string.Empty, status, clip, failureCode, captureChildren: true);
+        }
+
+        public static void WriteBinding(
+            GameObject prefab,
+            string transformPath,
+            GpuParticleBakeStatus status,
+            GpuParticleClip? clip,
+            string failureCode,
+            bool captureChildren = false,
+            bool addPlayer = false)
+        {
             string prefabPath = AssetDatabase.GetAssetPath(prefab);
             if (string.IsNullOrEmpty(prefabPath))
             {
@@ -22,14 +34,40 @@ namespace GpuParticle.Editor
             GameObject root = PrefabUtility.LoadPrefabContents(prefabPath);
             try
             {
-                GpuParticleBinding binding = root.GetComponent<GpuParticleBinding>();
-                if (binding == null)
+                GameObject target = root;
+                if (!string.IsNullOrEmpty(transformPath))
                 {
-                    binding = root.AddComponent<GpuParticleBinding>();
+                    Transform child = root.transform.Find(transformPath);
+                    if (child != null)
+                    {
+                        target = child.gameObject;
+                    }
                 }
 
-                ParticleSystem[] systems = root.GetComponentsInChildren<ParticleSystem>(true);
-                ParticleSystemRenderer[] renderers = root.GetComponentsInChildren<ParticleSystemRenderer>(true);
+                GpuParticleBinding binding = target.GetComponent<GpuParticleBinding>();
+                if (binding == null)
+                {
+                    binding = target.AddComponent<GpuParticleBinding>();
+                }
+
+                if (addPlayer && target.GetComponent<GpuParticlePlayer>() == null)
+                {
+                    target.AddComponent<GpuParticlePlayer>();
+                }
+
+                ParticleSystem[] systems;
+                ParticleSystemRenderer[] renderers;
+                if (captureChildren)
+                {
+                    systems = target.GetComponentsInChildren<ParticleSystem>(true);
+                    renderers = target.GetComponentsInChildren<ParticleSystemRenderer>(true);
+                }
+                else
+                {
+                    systems = target.GetComponents<ParticleSystem>();
+                    renderers = target.GetComponents<ParticleSystemRenderer>();
+                }
+
                 GpuParticleNativeSystemState[] systemStates = new GpuParticleNativeSystemState[systems.Length];
                 for (int i = 0; i < systems.Length; i++)
                 {
@@ -46,7 +84,11 @@ namespace GpuParticle.Editor
                     rendererStates[i] = state;
                 }
 
-                binding.Configure(status, clip, systemStates, rendererStates, failureCode);
+                string clipPath = clip != null ? AssetDatabase.GetAssetPath(clip) : string.Empty;
+                GpuParticleClip persistedClip = !string.IsNullOrEmpty(clipPath)
+                    ? AssetDatabase.LoadAssetAtPath<GpuParticleClip>(clipPath)
+                    : clip;
+                binding.Configure(status, persistedClip, systemStates, rendererStates, failureCode);
                 EditorUtility.SetDirty(binding);
                 PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
             }

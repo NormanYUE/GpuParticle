@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using GpuParticle.Editor.Baking;
 using GpuParticle.Runtime;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 
 namespace GpuParticle.Editor
@@ -71,17 +71,15 @@ namespace GpuParticle.Editor
             }
 
             PrepareSystems(systems);
-            GpuParticleStateCollector stateCollector = new GpuParticleStateCollector();
-            GpuParticleGeometryTrack[] tracks = CaptureGeometryTracks(
+            VatCaptureData? capture = CaptureVatData(
                 instance,
                 systems,
                 renderers,
                 settings.SampleRate,
                 duration,
-                stateCollector,
                 report);
 
-            if (report.HasFailure || tracks.Length == 0)
+            if (report.HasFailure || !capture.HasValue)
             {
                 GpuParticleFailure failure = report.HasFailure
                     ? report.Failure
@@ -89,10 +87,161 @@ namespace GpuParticle.Editor
                 return WriteNativeBinding(prefab, prefabPath, failure);
             }
 
-            Bounds bounds = CalculateBounds(tracks);
-            GpuParticleClip clip = WriteClipAsset(prefab, settings, duration, loop, bounds, tracks, stateCollector);
+            VatCaptureData data = capture.Value;
+            GpuParticleVatTextureBuilder.Result textures = GpuParticleVatTextureBuilder.Build(data.Frames, data.MaxParticles);
+            Bounds bounds = GpuParticleBoundsCalculator.Calculate(data.Frames);
+            Mesh mesh = BuildVatMesh(data);
+            Material material = CreateVatMaterial(data);
+
+            GpuParticleClip clip = WriteVatAssets(
+                prefab,
+                settings,
+                duration,
+                loop,
+                bounds,
+                data,
+                textures,
+                mesh,
+                material);
+
+            if (clip == null)
+            {
+                report.Fail(GpuParticleFailureCode.RuntimeGpuFailure, "Failed to write VAT clip assets.", prefabPath);
+                return WriteNativeBinding(prefab, prefabPath, report.Failure);
+            }
+
             GpuParticleBindingWriter.WriteBinding(prefab, GpuParticleBakeStatus.GpuReady, clip, string.Empty);
+            AssetDatabase.ImportAsset(prefabPath, ImportAssetOptions.ForceSynchronousImport);
             return new GpuParticleValidationResult(prefabPath, GpuParticleBakeStatus.GpuReady, GpuParticleFailure.None, clip);
+        }
+
+        public static GpuParticleValidationResult BakePrefabGroup(GameObject prefab)
+        {
+            return BakePrefabGroup(prefab, GpuParticleProjectSettings.LoadOrCreate());
+        }
+
+        public static GpuParticleValidationResult BakePrefabGroup(GameObject prefab, GpuParticleBakerSettings settings)
+        {
+            if (prefab == null)
+            {
+                return new GpuParticleValidationResult(
+                    string.Empty,
+                    GpuParticleBakeStatus.Native,
+                    new GpuParticleFailure(GpuParticleFailureCode.NativeRequired, "No prefab supplied."),
+                    null!);
+            }
+
+            string prefabPath = AssetDatabase.GetAssetPath(prefab);
+            if (string.IsNullOrEmpty(prefabPath) || !prefabPath.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase))
+            {
+                return new GpuParticleValidationResult(
+                    prefabPath,
+                    GpuParticleBakeStatus.Native,
+                    new GpuParticleFailure(GpuParticleFailureCode.NativeRequired, "Selected object is not a prefab asset."),
+                    null!);
+            }
+
+            GpuParticleBakeReport report = new GpuParticleBakeReport();
+            using GpuParticlePreviewScene previewScene = new GpuParticlePreviewScene(settings);
+            GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, previewScene.Scene);
+            if (instance == null)
+            {
+                report.Fail(GpuParticleFailureCode.NativeRequired, "Could not instantiate prefab in preview scene.", prefabPath);
+                return NativeResult(prefabPath, report.Failure);
+            }
+
+            ParticleSystem[] systems = instance.GetComponentsInChildren<ParticleSystem>(true);
+            ParticleSystemRenderer[] renderers = instance.GetComponentsInChildren<ParticleSystemRenderer>(true);
+            if (systems.Length == 0 || renderers.Length == 0)
+            {
+                report.Fail(GpuParticleFailureCode.MissingGeometry, "Prefab contains no particle systems/renderers.", prefabPath);
+                return NativeResult(prefabPath, report.Failure);
+            }
+
+            if (!AnalyzeSupported(systems, report))
+            {
+                return WriteNativeBinding(prefab, prefabPath, report.Failure);
+            }
+
+            float duration = EstimateDuration(systems, settings.MaxDuration, out bool loop);
+            if (duration <= 0f || duration > settings.MaxDuration)
+            {
+                report.Fail(
+                    GpuParticleFailureCode.NativeRequired,
+                    $"Estimated duration {duration:0.###} exceeds the configured max duration {settings.MaxDuration:0.###}.",
+                    prefabPath);
+                return WriteNativeBinding(prefab, prefabPath, report.Failure);
+            }
+
+            PrepareSystems(systems);
+            Dictionary<ParticleSystemRenderer, VatCaptureData> captures = CaptureAllRenderers(
+                instance,
+                systems,
+                renderers,
+                settings.SampleRate,
+                duration,
+                report);
+
+            if (captures.Count == 0)
+            {
+                GpuParticleFailure failure = report.HasFailure
+                    ? report.Failure
+                    : new GpuParticleFailure(GpuParticleFailureCode.MissingGeometry, "No visible particle geometry was captured.", prefabPath);
+                return WriteNativeBinding(prefab, prefabPath, failure);
+            }
+
+            DeleteGeneratedFolder(prefab, settings);
+
+            int bakedCount = 0;
+            foreach (KeyValuePair<ParticleSystemRenderer, VatCaptureData> entry in captures)
+            {
+                VatCaptureData data = entry.Value;
+                GpuParticleVatTextureBuilder.Result textures = GpuParticleVatTextureBuilder.Build(data.Frames, data.MaxParticles);
+                Bounds bounds = GpuParticleBoundsCalculator.Calculate(data.Frames);
+                Mesh mesh = BuildVatMesh(data);
+                Material material = CreateVatMaterial(data);
+
+                string systemName = GetTransformPath(instance.transform, entry.Key.transform);
+                if (string.IsNullOrEmpty(systemName))
+                {
+                    systemName = entry.Key.gameObject.name;
+                }
+
+                GpuParticleClip clip = WriteVatAssets(
+                    prefab,
+                    settings,
+                    duration,
+                    loop,
+                    bounds,
+                    data,
+                    textures,
+                    mesh,
+                    material,
+                    systemName);
+
+                if (clip != null)
+                {
+                    GpuParticleBindingWriter.WriteBinding(
+                        prefab,
+                        systemName,
+                        GpuParticleBakeStatus.GpuReady,
+                        clip,
+                        string.Empty,
+                        captureChildren: false,
+                        addPlayer: true);
+                    bakedCount++;
+                }
+            }
+
+            if (bakedCount == 0)
+            {
+                report.Fail(GpuParticleFailureCode.RuntimeGpuFailure, "Failed to write any VAT clip assets.", prefabPath);
+                return WriteNativeBinding(prefab, prefabPath, report.Failure);
+            }
+
+            AddGroupPlayer(prefab);
+            AssetDatabase.ImportAsset(prefabPath, ImportAssetOptions.ForceSynchronousImport);
+            return new GpuParticleValidationResult(prefabPath, GpuParticleBakeStatus.GpuReady, GpuParticleFailure.None, null!);
         }
 
         public static GpuParticleValidationResult ValidatePrefab(GameObject prefab)
@@ -142,6 +291,40 @@ namespace GpuParticle.Editor
 
             GpuParticleClip? clip = prefab.GetComponent<GpuParticleBinding>()?.Clip;
             GpuParticleBindingWriter.WriteBinding(prefab, GpuParticleBakeStatus.Native, clip, "RevertedToNative");
+        }
+
+        private static void DeleteGeneratedFolder(GameObject prefab, GpuParticleBakerSettings settings)
+        {
+            string folder = $"{settings.OutputRoot.TrimEnd('/')}/{prefab.name}";
+            if (AssetDatabase.IsValidFolder(folder))
+            {
+                AssetDatabase.DeleteAsset(folder);
+            }
+        }
+
+        private static void AddGroupPlayer(GameObject prefab)
+        {
+            string prefabPath = AssetDatabase.GetAssetPath(prefab);
+            if (string.IsNullOrEmpty(prefabPath))
+            {
+                return;
+            }
+
+            GameObject root = PrefabUtility.LoadPrefabContents(prefabPath);
+            try
+            {
+                if (root.GetComponent<GpuParticleGroupPlayer>() == null)
+                {
+                    root.AddComponent<GpuParticleGroupPlayer>();
+                }
+
+                EditorUtility.SetDirty(root);
+                PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
         }
 
         private static GpuParticleValidationResult WriteNativeBinding(
@@ -205,7 +388,6 @@ namespace GpuParticle.Editor
                 systems[i].Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
                 systems[i].Clear(true);
             }
-
         }
 
         private static float EstimateDuration(ParticleSystem[] systems, float maxDuration, out bool loop)
@@ -245,95 +427,130 @@ namespace GpuParticle.Editor
             }
         }
 
-        private static GpuParticleGeometryTrack[] CaptureGeometryTracks(
+        private readonly struct VatCaptureData
+        {
+            public readonly GpuParticleRenderMode RenderMode;
+            public readonly GpuParticleAlignment Alignment;
+            public readonly Material SourceMaterial;
+            public readonly Mesh SourceMesh;
+            public readonly int MaxParticles;
+            public readonly IReadOnlyList<GpuParticleBlobParticleState[]> Frames;
+
+            public VatCaptureData(
+                GpuParticleRenderMode renderMode,
+                GpuParticleAlignment alignment,
+                Material sourceMaterial,
+                Mesh sourceMesh,
+                int maxParticles,
+                IReadOnlyList<GpuParticleBlobParticleState[]> frames)
+            {
+                RenderMode = renderMode;
+                Alignment = alignment;
+                SourceMaterial = sourceMaterial;
+                SourceMesh = sourceMesh;
+                MaxParticles = maxParticles;
+                Frames = frames;
+            }
+        }
+
+        private static VatCaptureData? CaptureVatData(
             GameObject root,
             ParticleSystem[] systems,
             ParticleSystemRenderer[] renderers,
             float sampleRate,
             float duration,
-            GpuParticleStateCollector stateCollector,
             GpuParticleBakeReport report)
         {
-            int frameCount = Mathf.CeilToInt(duration * sampleRate) + 1;
-            ParticleSystemRenderer[] orderedRenderers = SortRenderersForPlayback(root.transform, renderers);
-            List<GpuParticleGeometryTrack> tracks = new List<GpuParticleGeometryTrack>(orderedRenderers.Length);
-            ParticleSystem[] rootSystems = GetRootSystems(root.transform, systems);
-            float dt = 1f / sampleRate;
+            Dictionary<ParticleSystemRenderer, VatCaptureData> allData = CaptureAllRenderers(
+                root, systems, renderers, sampleRate, duration, report);
 
-            for (int rendererIndex = 0; rendererIndex < orderedRenderers.Length; rendererIndex++)
+            if (allData.Count == 0)
             {
-                ParticleSystemRenderer renderer = orderedRenderers[rendererIndex];
+                report.Fail(GpuParticleFailureCode.MissingGeometry, "No visible particle geometry was captured.", AssetDatabase.GetAssetPath(root));
+                return null;
+            }
+
+            ParticleSystemRenderer[] orderedRenderers = SortRenderersForPlayback(root.transform, renderers);
+            foreach (ParticleSystemRenderer renderer in orderedRenderers)
+            {
+                if (renderer != null && allData.TryGetValue(renderer, out VatCaptureData data))
+                {
+                    return data;
+                }
+            }
+
+            report.Fail(GpuParticleFailureCode.MissingGeometry, "No supported particle renderer found.", AssetDatabase.GetAssetPath(root));
+            return null;
+        }
+
+        private static Dictionary<ParticleSystemRenderer, VatCaptureData> CaptureAllRenderers(
+            GameObject root,
+            ParticleSystem[] systems,
+            ParticleSystemRenderer[] renderers,
+            float sampleRate,
+            float duration,
+            GpuParticleBakeReport report)
+        {
+            var result = new Dictionary<ParticleSystemRenderer, VatCaptureData>();
+            var validRenderers = new List<ParticleSystemRenderer>();
+            var framesPerRenderer = new Dictionary<ParticleSystemRenderer, List<GpuParticleBlobParticleState[]>>();
+
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                ParticleSystemRenderer renderer = renderers[i];
                 if (renderer == null || renderer.renderMode == ParticleSystemRenderMode.None)
                 {
                     continue;
                 }
 
-                GpuParticleRenderMode renderMode = MapRenderMode(renderer);
-                GpuParticleAlignment alignment = MapAlignment(renderer);
-                GpuParticleRendererRecipe rendererRecipe = BuildRendererRecipe(root.transform, renderer);
-                GpuParticleMaterialRecipe[] materialRecipes = BuildMaterialRecipes(renderer);
-                GpuParticleMaterialRecipe[] trailMaterialRecipes = BuildTrailMaterialRecipes(renderer);
-                if (materialRecipes.Length == 0)
+                if (renderer.GetComponent<ParticleSystem>() == null)
                 {
-                    report.Fail(GpuParticleFailureCode.UnsupportedShader, "Particle renderer has no material.", GetTransformPath(renderer.transform));
-                    return Array.Empty<GpuParticleGeometryTrack>();
+                    continue;
                 }
 
-                ParticleSystem system = renderer.GetComponent<ParticleSystem>();
-                Mesh sharedMesh = renderMode == GpuParticleRenderMode.Mesh ? renderer.mesh : null!;
-                List<GpuParticleGeometryFrame> frames = new List<GpuParticleGeometryFrame>(frameCount);
-                bool visible = false;
-                Dictionary<uint, List<GpuParticleBlobTrailState>> trailHistory = new Dictionary<uint, List<GpuParticleBlobTrailState>>();
-                ResetAndPlay(rootSystems);
-                for (int frame = 0; frame < frameCount; frame++)
+                validRenderers.Add(renderer);
+                framesPerRenderer[renderer] = new List<GpuParticleBlobParticleState[]>();
+            }
+
+            if (validRenderers.Count == 0)
+            {
+                report.Fail(GpuParticleFailureCode.MissingGeometry, "No supported particle renderer found.", AssetDatabase.GetAssetPath(root));
+                return result;
+            }
+
+            int frameCount = Mathf.CeilToInt(duration * sampleRate) + 1;
+            float dt = 1f / sampleRate;
+            ParticleSystem[] rootSystems = GetRootSystems(root.transform, systems);
+
+            ResetAndPlay(rootSystems);
+            for (int frame = 0; frame < frameCount; frame++)
+            {
+                for (int rendererIndex = 0; rendererIndex < validRenderers.Count; rendererIndex++)
                 {
-                    float time = frame * dt;
-                    Bounds bounds = new Bounds(Vector3.zero, Vector3.zero);
-                    bool hasBounds = false;
+                    ParticleSystemRenderer renderer = validRenderers[rendererIndex];
+                    ParticleSystem system = renderer.GetComponent<ParticleSystem>();
+                    int maxParticles = system.main.maxParticles;
+                    GpuParticleBlobParticleState[] states = CaptureParticleStates(system, maxParticles);
+                    framesPerRenderer[renderer].Add(states);
+                }
 
-                    int particleStateOffset = 0;
-                    int particleCount = 0;
-                    int meshTransformOffset = 0;
-                    int meshTransformCount = 0;
-                    int trailStateOffset = 0;
-                    int trailCount = 0;
+                for (int systemIndex = 0; systemIndex < rootSystems.Length; systemIndex++)
+                {
+                    rootSystems[systemIndex].Simulate(dt, true, false, false);
+                }
+            }
 
-                    if (renderMode == GpuParticleRenderMode.Mesh)
+            for (int i = 0; i < validRenderers.Count; i++)
+            {
+                ParticleSystemRenderer renderer = validRenderers[i];
+                List<GpuParticleBlobParticleState[]> frames = framesPerRenderer[renderer];
+                bool visible = false;
+                for (int frameIndex = 0; frameIndex < frames.Count; frameIndex++)
+                {
+                    if (frames[frameIndex].Length > 0)
                     {
-                        GpuParticleBlobMeshTransform[] transforms = CaptureMeshTransforms(system, renderer, ref bounds, ref hasBounds);
-                        meshTransformOffset = stateCollector.AppendMeshTransforms(transforms);
-                        meshTransformCount = transforms.Length;
-                    }
-                    else
-                    {
-                        GpuParticleBlobParticleState[] states = CaptureParticleStates(system, renderer, renderMode, ref bounds, ref hasBounds);
-                        particleStateOffset = stateCollector.AppendParticleStates(states);
-                        particleCount = states.Length;
-                    }
-
-                    if (system != null && system.trails.enabled)
-                    {
-                        GpuParticleBlobTrailState[] trails = CaptureTrailStates(system, renderer, trailHistory, ref bounds, ref hasBounds);
-                        trailStateOffset = stateCollector.AppendTrailStates(trails);
-                        trailCount = trails.Length;
-                    }
-
-                    visible |= hasBounds;
-                    GpuParticleGeometryFrame geometryFrame = new GpuParticleGeometryFrame();
-                    geometryFrame.Configure(
-                        time,
-                        particleCount,
-                        particleStateOffset,
-                        meshTransformCount,
-                        meshTransformOffset,
-                        trailCount,
-                        trailStateOffset,
-                        hasBounds ? bounds : new Bounds(Vector3.zero, Vector3.zero));
-                    frames.Add(geometryFrame);
-
-                    for (int systemIndex = 0; systemIndex < rootSystems.Length; systemIndex++)
-                    {
-                        rootSystems[systemIndex].Simulate(dt, true, false, false);
+                        visible = true;
+                        break;
                     }
                 }
 
@@ -342,21 +559,62 @@ namespace GpuParticle.Editor
                     continue;
                 }
 
-                GpuParticleGeometryTrack track = new GpuParticleGeometryTrack();
-                track.Configure(
-                    GetTransformPath(root.transform, renderer.transform),
+                ParticleSystem system = renderer.GetComponent<ParticleSystem>();
+                GpuParticleRenderMode renderMode = MapRenderMode(renderer);
+                GpuParticleAlignment alignment = MapAlignment(renderer);
+                Material sourceMaterial = renderer.sharedMaterial;
+                Mesh sourceMesh = renderMode == GpuParticleRenderMode.Mesh ? renderer.mesh : null!;
+                if (renderMode == GpuParticleRenderMode.Mesh && sourceMesh == null)
+                {
+                    continue;
+                }
+
+                result[renderer] = new VatCaptureData(
                     renderMode,
                     alignment,
-                    rendererRecipe,
-                    materialRecipes,
-                    trailMaterialRecipes.Length > 0 ? trailMaterialRecipes : materialRecipes,
-                    sharedMesh,
-                    frames.ToArray(),
-                    CalculateTrackBounds(frames));
-                tracks.Add(track);
+                    sourceMaterial,
+                    sourceMesh,
+                    system.main.maxParticles,
+                    frames);
             }
 
-            return tracks.ToArray();
+            return result;
+        }
+
+        private static GpuParticleBlobParticleState[] CaptureParticleStates(ParticleSystem system, int maxParticles)
+        {
+            if (system == null || maxParticles <= 0)
+            {
+                return Array.Empty<GpuParticleBlobParticleState>();
+            }
+
+            var particles = new ParticleSystem.Particle[maxParticles];
+            int count = system.GetParticles(particles);
+            if (count <= 0)
+            {
+                return Array.Empty<GpuParticleBlobParticleState>();
+            }
+
+            Array.Sort(particles, 0, count, Comparer<ParticleSystem.Particle>.Create((a, b) => a.randomSeed.CompareTo(b.randomSeed)));
+
+            var states = new GpuParticleBlobParticleState[count];
+            for (int i = 0; i < count; i++)
+            {
+                ParticleSystem.Particle p = particles[i];
+                Quaternion rotation = Quaternion.Euler(p.rotation3D);
+                states[i] = new GpuParticleBlobParticleState
+                {
+                    Position = p.position,
+                    Velocity = p.velocity,
+                    Size = p.GetCurrentSize3D(system).x,
+                    Rotation = new Vector4(rotation.x, rotation.y, rotation.z, rotation.w),
+                    Color = p.GetCurrentColor(system),
+                    Lifetime = 1f - p.remainingLifetime / Mathf.Max(p.startLifetime, 0.0001f),
+                    Seed = p.randomSeed,
+                };
+            }
+
+            return states;
         }
 
         private static GpuParticleRenderMode MapRenderMode(ParticleSystemRenderer renderer)
@@ -382,178 +640,218 @@ namespace GpuParticle.Editor
             };
         }
 
-        private static GpuParticleBlobParticleState[] CaptureParticleStates(
-            ParticleSystem system,
-            ParticleSystemRenderer renderer,
-            GpuParticleRenderMode renderMode,
-            ref Bounds bounds,
-            ref bool hasBounds)
+        private static Mesh BuildVatMesh(VatCaptureData data)
         {
-            if (system == null)
+            if (data.RenderMode == GpuParticleRenderMode.Mesh && data.SourceMesh != null)
             {
-                return Array.Empty<GpuParticleBlobParticleState>();
+                return GpuParticleVatMeshBuilder.BuildFromSource(data.SourceMesh, data.MaxParticles);
             }
 
-            int maxParticles = system.main.maxParticles;
-            var particles = new ParticleSystem.Particle[maxParticles];
-            int count = system.GetParticles(particles);
+            return GpuParticleVatMeshBuilder.Build(data.MaxParticles);
+        }
 
-            var states = new GpuParticleBlobParticleState[count];
-            for (int i = 0; i < count; i++)
+        private static Material CreateVatMaterial(VatCaptureData data)
+        {
+            string shaderName = data.RenderMode switch
             {
-                ParticleSystem.Particle p = particles[i];
-                states[i] = new GpuParticleBlobParticleState
+                GpuParticleRenderMode.StretchedBillboard => "GpuParticle/VatStretch",
+                GpuParticleRenderMode.Mesh => "GpuParticle/VatMesh",
+                _ => "GpuParticle/VatBillboard",
+            };
+
+            Shader shader = Shader.Find(shaderName);
+            Material material = shader != null ? new Material(shader) : new Material(Shader.Find("Hidden/InternalErrorShader"));
+
+            if (data.SourceMaterial != null)
+            {
+                Texture mainTex = data.SourceMaterial.GetTexture("_MainTex");
+                if (mainTex != null)
                 {
-                    Position = p.position,
-                    Velocity = p.velocity,
-                    Size = p.GetCurrentSize3D(system).x,
-                    Rotation = new Vector4(p.rotation3D.x, p.rotation3D.y, p.rotation3D.z, 1f),
-                    Color = p.GetCurrentColor(system),
-                    Lifetime = 1f - p.remainingLifetime / Mathf.Max(p.startLifetime, 0.0001f),
-                    Seed = p.randomSeed,
+                    material.SetTexture("_MainTex", mainTex);
+                }
+
+                material.renderQueue = data.SourceMaterial.renderQueue;
+            }
+
+            if (data.RenderMode == GpuParticleRenderMode.StretchedBillboard)
+            {
+                material.SetFloat("_StretchScale", 0.1f);
+            }
+
+            if (data.RenderMode == GpuParticleRenderMode.Billboard || data.RenderMode == GpuParticleRenderMode.StretchedBillboard)
+            {
+                string keyword = data.Alignment switch
+                {
+                    GpuParticleAlignment.Facing => "ALIGNMENT_FACING",
+                    GpuParticleAlignment.World => "ALIGNMENT_WORLD",
+                    GpuParticleAlignment.Local => "ALIGNMENT_LOCAL",
+                    _ => "ALIGNMENT_VIEW",
                 };
+                material.EnableKeyword(keyword);
+            }
 
-                Vector3 size = Vector3.one * states[i].Size;
-                Bounds particleBounds = new Bounds(states[i].Position, size);
-                if (hasBounds)
+            return material;
+        }
+
+        private static GpuParticleClip WriteVatAssets(
+            GameObject prefab,
+            GpuParticleBakerSettings settings,
+            float duration,
+            bool loop,
+            Bounds bounds,
+            VatCaptureData data,
+            GpuParticleVatTextureBuilder.Result textures,
+            Mesh mesh,
+            Material material)
+        {
+            return WriteVatAssets(prefab, settings, duration, loop, bounds, data, textures, mesh, material, string.Empty);
+        }
+
+        private static GpuParticleClip WriteVatAssets(
+            GameObject prefab,
+            GpuParticleBakerSettings settings,
+            float duration,
+            bool loop,
+            Bounds bounds,
+            VatCaptureData data,
+            GpuParticleVatTextureBuilder.Result textures,
+            Mesh mesh,
+            Material material,
+            string systemName)
+        {
+            string prefabPath = AssetDatabase.GetAssetPath(prefab);
+            string prefabGuid = AssetDatabase.AssetPathToGUID(prefabPath);
+            string safeSystemName = SanitizeFileName(systemName);
+            bool hasSystemName = !string.IsNullOrEmpty(safeSystemName);
+
+            string folder = hasSystemName
+                ? $"{settings.OutputRoot.TrimEnd('/')}/{prefab.name}/{safeSystemName}"
+                : $"{settings.OutputRoot.TrimEnd('/')}/{prefab.name}";
+            GpuParticleProjectSettings.EnsureFolder(folder);
+
+            string filePrefix = hasSystemName ? safeSystemName : prefab.name;
+            string clipPath = $"{folder}/{filePrefix}.gpuparticle.asset";
+            string vatPrefabPath = $"{folder}/{filePrefix}_VAT.prefab";
+            string legacyPayloadPath = $"{folder}/{filePrefix}.gpuparticle.bytes";
+
+            if (AssetDatabase.LoadAssetAtPath<GpuParticleClip>(clipPath) != null)
+            {
+                AssetDatabase.DeleteAsset(clipPath);
+            }
+
+            if (AssetDatabase.LoadAssetAtPath<TextAsset>(legacyPayloadPath) != null)
+            {
+                AssetDatabase.DeleteAsset(legacyPayloadPath);
+            }
+
+            DeleteAssetIfExists(vatPrefabPath);
+
+            string posPath = $"{folder}/{filePrefix}_PositionSize.asset";
+            string colorPath = $"{folder}/{filePrefix}_Color.asset";
+            string rotPath = $"{folder}/{filePrefix}_Rotation.asset";
+            string velPath = $"{folder}/{filePrefix}_VelocityLifetime.asset";
+            string meshPath = $"{folder}/{filePrefix}_VATMesh.asset";
+            string materialPath = $"{folder}/{filePrefix}_VATMaterial.mat";
+
+            DeleteAssetIfExists(posPath);
+            DeleteAssetIfExists(colorPath);
+            DeleteAssetIfExists(rotPath);
+            DeleteAssetIfExists(velPath);
+            DeleteAssetIfExists(meshPath);
+            DeleteAssetIfExists(materialPath);
+
+            AssetDatabase.CreateAsset(textures.PositionSize, posPath);
+            AssetDatabase.CreateAsset(textures.Color, colorPath);
+            AssetDatabase.CreateAsset(textures.Rotation, rotPath);
+            AssetDatabase.CreateAsset(textures.VelocityLifetime, velPath);
+            AssetDatabase.CreateAsset(mesh, meshPath);
+            AssetDatabase.CreateAsset(material, materialPath);
+            AssetDatabase.SaveAssets();
+
+            ImportAssetIfExists(posPath);
+            ImportAssetIfExists(colorPath);
+            ImportAssetIfExists(rotPath);
+            ImportAssetIfExists(velPath);
+            ImportAssetIfExists(meshPath);
+            ImportAssetIfExists(materialPath);
+
+            GpuParticleClip clip = ScriptableObject.CreateInstance<GpuParticleClip>();
+            AssetDatabase.CreateAsset(clip, clipPath);
+            clip.Configure(
+                prefabGuid,
+                GpuParticleSourceHasher.ComputePrefabHash(prefab),
+                GpuParticleSourceHasher.ComputeFingerprint(prefab, settings),
+                GpuParticleBakeStatus.GpuReady,
+                duration,
+                settings.SampleRate,
+                loop,
+                bounds,
+                GpuParticleCapability.ComputePlayback,
+                null!,
+                null,
+                Array.Empty<GpuParticleGeometryTrack>());
+            AssetDatabase.SaveAssets();
+
+            Mesh persistedMesh = AssetDatabase.LoadAssetAtPath<Mesh>(meshPath);
+            Material persistedMaterial = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
+            GameObject vatPrefab = GpuParticlePrefabBuilder.Build(vatPrefabPath, persistedMesh, persistedMaterial, clip);
+
+            clip.ConfigureVat(
+                vatPrefab,
+                duration,
+                data.Frames.Count,
+                data.MaxParticles,
+                bounds,
+                textures.PositionSize,
+                textures.Color,
+                textures.Rotation,
+                textures.VelocityLifetime);
+
+            EditorUtility.SetDirty(clip);
+            AssetDatabase.SaveAssets();
+            AssetDatabase.ImportAsset(clipPath, ImportAssetOptions.ForceSynchronousImport);
+            return clip;
+        }
+
+        private static string SanitizeFileName(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                return string.Empty;
+            }
+
+            char[] invalid = System.IO.Path.GetInvalidFileNameChars();
+            System.Text.StringBuilder sb = new System.Text.StringBuilder(name.Length);
+            for (int i = 0; i < name.Length; i++)
+            {
+                char c = name[i];
+                if (c == '/' || c == '\\' || System.Array.IndexOf(invalid, c) >= 0)
                 {
-                    bounds.Encapsulate(particleBounds);
+                    sb.Append('_');
                 }
                 else
                 {
-                    bounds = particleBounds;
-                    hasBounds = true;
+                    sb.Append(c);
                 }
             }
 
-            return states;
+            return sb.ToString();
         }
 
-        private static GpuParticleBlobMeshTransform[] CaptureMeshTransforms(
-            ParticleSystem system,
-            ParticleSystemRenderer renderer,
-            ref Bounds bounds,
-            ref bool hasBounds)
+        private static void DeleteAssetIfExists(string assetPath)
         {
-            if (system == null)
+            if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath) != null)
             {
-                return Array.Empty<GpuParticleBlobMeshTransform>();
+                AssetDatabase.DeleteAsset(assetPath);
             }
-
-            int maxParticles = system.main.maxParticles;
-            var particles = new ParticleSystem.Particle[maxParticles];
-            int count = system.GetParticles(particles);
-
-            var transforms = new GpuParticleBlobMeshTransform[count];
-            for (int i = 0; i < count; i++)
-            {
-                ParticleSystem.Particle p = particles[i];
-                transforms[i] = new GpuParticleBlobMeshTransform
-                {
-                    Position = p.position,
-                    Rotation = Quaternion.Euler(p.rotation3D),
-                    Scale = Vector3.one * p.GetCurrentSize3D(system).x,
-                    Color = p.GetCurrentColor(system),
-                };
-
-                Bounds transformBounds = new Bounds(transforms[i].Position, transforms[i].Scale);
-                if (hasBounds)
-                {
-                    bounds.Encapsulate(transformBounds);
-                }
-                else
-                {
-                    bounds = transformBounds;
-                    hasBounds = true;
-                }
-            }
-
-            return transforms;
         }
 
-        private static GpuParticleBlobTrailState[] CaptureTrailStates(
-            ParticleSystem system,
-            ParticleSystemRenderer renderer,
-            Dictionary<uint, List<GpuParticleBlobTrailState>> history,
-            ref Bounds bounds,
-            ref bool hasBounds)
+        private static void ImportAssetIfExists(string assetPath)
         {
-            if (system == null || !system.trails.enabled)
+            if (!string.IsNullOrEmpty(assetPath) && AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath) != null)
             {
-                return Array.Empty<GpuParticleBlobTrailState>();
+                AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate);
             }
-
-            int maxParticles = system.main.maxParticles;
-            var particles = new ParticleSystem.Particle[maxParticles];
-            int count = system.GetParticles(particles);
-
-            var result = new List<GpuParticleBlobTrailState>();
-            for (int i = 0; i < count; i++)
-            {
-                uint id = particles[i].randomSeed;
-                if (!history.TryGetValue(id, out var points))
-                {
-                    points = new List<GpuParticleBlobTrailState>();
-                    history[id] = points;
-                }
-
-                points.Insert(0, new GpuParticleBlobTrailState
-                {
-                    Position = particles[i].position,
-                    Width = system.trails.widthOverTrail.Evaluate(0f),
-                    Color = particles[i].GetCurrentColor(system),
-                    ParticleId = id,
-                });
-
-                int maxHistory = Mathf.CeilToInt(system.trails.lifetime.constantMax * 120f) + 2;
-                while (points.Count > maxHistory)
-                {
-                    points.RemoveAt(points.Count - 1);
-                }
-
-                for (int p = 0; p < points.Count; p++)
-                {
-                    result.Add(points[p]);
-                    Bounds pointBounds = new Bounds(points[p].Position, Vector3.one * points[p].Width);
-                    if (hasBounds)
-                    {
-                        bounds.Encapsulate(pointBounds);
-                    }
-                    else
-                    {
-                        bounds = pointBounds;
-                        hasBounds = true;
-                    }
-                }
-            }
-
-            return result.ToArray();
-        }
-
-        private static Bounds CalculateTrackBounds(List<GpuParticleGeometryFrame> frames)
-        {
-            bool hasBounds = false;
-            Bounds bounds = new Bounds(Vector3.zero, Vector3.zero);
-            for (int i = 0; i < frames.Count; i++)
-            {
-                Bounds frameBounds = frames[i].FrameLocalBounds;
-                if (frameBounds.size.sqrMagnitude <= 0f)
-                {
-                    continue;
-                }
-
-                if (!hasBounds)
-                {
-                    bounds = frameBounds;
-                    hasBounds = true;
-                }
-                else
-                {
-                    bounds.Encapsulate(frameBounds);
-                }
-            }
-
-            return bounds;
         }
 
         private static ParticleSystemRenderer[] SortRenderersForPlayback(
@@ -650,156 +948,10 @@ namespace GpuParticle.Editor
             }
         }
 
-        private static GpuParticleRendererRecipe BuildRendererRecipe(Transform root, ParticleSystemRenderer renderer)
-        {
-            int queue = 3000;
-            Material material = renderer.sharedMaterial;
-            if (material != null)
-            {
-                queue = material.renderQueue;
-            }
-
-            GpuParticleRendererRecipe recipe = new GpuParticleRendererRecipe();
-            recipe.Configure(
-                GetTransformPath(root, renderer.transform),
-                renderer.gameObject.layer,
-                renderer.sortingLayerID,
-                renderer.sortingOrder,
-                ComputeRendererPriority(renderer),
-                queue,
-                renderer.shadowCastingMode,
-                renderer.receiveShadows);
-            return recipe;
-        }
-
-        private static int ComputeRendererPriority(ParticleSystemRenderer renderer)
-        {
-            int layerValue = SortingLayer.GetLayerValueFromID(renderer.sortingLayerID);
-            long priority = (long)layerValue * 1000L + renderer.sortingOrder;
-            if (priority > int.MaxValue)
-            {
-                return int.MaxValue;
-            }
-
-            if (priority < int.MinValue)
-            {
-                return int.MinValue;
-            }
-
-            return (int)priority;
-        }
-
         private static int GetMaterialRenderQueue(ParticleSystemRenderer renderer)
         {
             Material material = renderer.sharedMaterial;
             return material == null ? 3000 : material.renderQueue;
-        }
-
-        private static GpuParticleMaterialRecipe[] BuildMaterialRecipes(ParticleSystemRenderer renderer)
-        {
-            Material[] materials = renderer.sharedMaterials;
-            if (materials == null || materials.Length == 0)
-            {
-                return Array.Empty<GpuParticleMaterialRecipe>();
-            }
-
-            GpuParticleMaterialRecipe[] recipes = new GpuParticleMaterialRecipe[materials.Length];
-            for (int i = 0; i < materials.Length; i++)
-            {
-                GpuParticleMaterialRecipe recipe = new GpuParticleMaterialRecipe();
-                recipe.Configure(materials[i], i, materials[i] != null && materials[i].enableInstancing);
-                recipes[i] = recipe;
-            }
-
-            return recipes;
-        }
-
-        private static GpuParticleMaterialRecipe[] BuildTrailMaterialRecipes(ParticleSystemRenderer renderer)
-        {
-            ParticleSystem system = renderer.GetComponent<ParticleSystem>();
-            if (system == null || !system.trails.enabled || renderer.trailMaterial == null)
-            {
-                return Array.Empty<GpuParticleMaterialRecipe>();
-            }
-
-            GpuParticleMaterialRecipe recipe = new GpuParticleMaterialRecipe();
-            recipe.Configure(renderer.trailMaterial, 0, renderer.trailMaterial.enableInstancing);
-            return new[] { recipe };
-        }
-
-        private static Bounds CalculateBounds(GpuParticleGeometryTrack[] tracks)
-        {
-            bool hasBounds = false;
-            Bounds bounds = new Bounds(Vector3.zero, Vector3.zero);
-            for (int t = 0; t < tracks.Length; t++)
-            {
-                Bounds trackBounds = tracks[t].LocalBounds;
-                if (trackBounds.size.sqrMagnitude <= 0f)
-                {
-                    continue;
-                }
-
-                if (!hasBounds)
-                {
-                    bounds = trackBounds;
-                    hasBounds = true;
-                }
-                else
-                {
-                    bounds.Encapsulate(trackBounds);
-                }
-            }
-
-            return bounds;
-        }
-
-        private static GpuParticleClip WriteClipAsset(
-            GameObject prefab,
-            GpuParticleBakerSettings settings,
-            float duration,
-            bool loop,
-            Bounds bounds,
-            GpuParticleGeometryTrack[] tracks,
-            GpuParticleStateCollector stateCollector)
-        {
-            string prefabPath = AssetDatabase.GetAssetPath(prefab);
-            string prefabGuid = AssetDatabase.AssetPathToGUID(prefabPath);
-            string folder = $"{settings.OutputRoot.TrimEnd('/')}/{prefab.name}";
-            GpuParticleProjectSettings.EnsureFolder(folder);
-
-            string clipPath = $"{folder}/{prefab.name}.gpuparticle.asset";
-            string payloadPath = $"{folder}/{prefab.name}.gpuparticle.bytes";
-
-            byte[] payloadBytes = stateCollector.CreateBlob(settings.SampleRate, duration, tracks.Length);
-            File.WriteAllBytes(payloadPath, payloadBytes);
-            AssetDatabase.ImportAsset(payloadPath, ImportAssetOptions.ForceSynchronousImport);
-            TextAsset payload = AssetDatabase.LoadAssetAtPath<TextAsset>(payloadPath);
-
-            if (AssetDatabase.LoadAssetAtPath<GpuParticleClip>(clipPath) != null)
-            {
-                AssetDatabase.DeleteAsset(clipPath);
-            }
-
-            GpuParticleClip clip = ScriptableObject.CreateInstance<GpuParticleClip>();
-            AssetDatabase.CreateAsset(clip, clipPath);
-            clip.Configure(
-                prefabGuid,
-                GpuParticleSourceHasher.ComputePrefabHash(prefab),
-                GpuParticleSourceHasher.ComputeFingerprint(prefab, settings),
-                GpuParticleBakeStatus.GpuReady,
-                duration,
-                settings.SampleRate,
-                loop,
-                bounds,
-                GpuParticleCapability.ComputePlayback,
-                payload,
-                null,
-                tracks);
-
-            EditorUtility.SetDirty(clip);
-            AssetDatabase.SaveAssets();
-            AssetDatabase.ImportAsset(clipPath, ImportAssetOptions.ForceSynchronousImport);
-            return AssetDatabase.LoadAssetAtPath<GpuParticleClip>(clipPath);
         }
 
         private static string GetTransformPath(Transform transform)

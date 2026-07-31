@@ -25,6 +25,11 @@ namespace GpuParticle.Runtime
             }
         }
 
+        public GpuParticleHandle Play()
+        {
+            return Play(new GpuParticlePlayParams(transform.localToWorldMatrix));
+        }
+
         public GpuParticleHandle Play(in GpuParticlePlayParams parameters)
         {
             GpuParticleBinding current = CurrentBinding;
@@ -96,6 +101,18 @@ namespace GpuParticle.Runtime
             else
             {
                 GpuParticleNativeFallback.Resume(CurrentBinding);
+            }
+        }
+
+        public void SetTimeScale(float timeScale)
+        {
+            if (handle.IsValid)
+            {
+                GpuParticleVatRenderSystem.Instance.SetTimeScale(handle.SlotIndex, handle.Generation, timeScale);
+            }
+            else
+            {
+                GpuParticleNativeFallback.SetTimeScale(CurrentBinding, timeScale);
             }
         }
 

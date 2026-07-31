@@ -154,6 +154,27 @@ namespace GpuParticle.Runtime
             }
         }
 
+        public static void SetTimeScale(GpuParticleBinding binding, float timeScale)
+        {
+            if (binding == null)
+            {
+                return;
+            }
+
+            GpuParticleNativeSystemState[] states = binding.NativeSystemStates;
+            for (int i = 0; i < states.Length; i++)
+            {
+                ParticleSystem system = states[i].System;
+                if (system == null)
+                {
+                    continue;
+                }
+
+                ParticleSystem.MainModule main = system.main;
+                main.simulationSpeed = states[i].SimulationSpeed * Mathf.Max(0f, timeScale);
+            }
+        }
+
         public static bool IsAnyAlive(GpuParticleBinding binding)
         {
             if (binding == null)
