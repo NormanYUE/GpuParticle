@@ -90,6 +90,16 @@ namespace GpuParticle.Runtime
             Unregister(slotIndex, generation);
         }
 
+        public int GetGeneration(int slotIndex)
+        {
+            if (slotIndex < 0 || slotIndex >= pool.Capacity)
+            {
+                return -1;
+            }
+
+            return pool.GetGeneration(slotIndex);
+        }
+
         private void Subscribe()
         {
             if (subscribed)

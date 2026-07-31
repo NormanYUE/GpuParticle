@@ -104,6 +104,16 @@ namespace GpuParticle.Runtime
                 && slots[index].Generation == generation;
         }
 
+        public int GetGeneration(int index)
+        {
+            if (index < 0 || index >= slots.Length)
+            {
+                return -1;
+            }
+
+            return slots[index].Generation;
+        }
+
         public void UpdateAll(float deltaTime)
         {
             for (int i = 0; i < aliveCount; i++)

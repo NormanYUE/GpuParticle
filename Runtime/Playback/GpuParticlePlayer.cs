@@ -38,31 +38,33 @@ namespace GpuParticle.Runtime
             }
 
             Stop(clear: true);
+            current.SuppressNativeRenderers();
 
-            GameObject instance = Object.Instantiate(current.Clip.Prefab);
-            instance.transform.position = parameters.LocalToWorld.GetColumn(3);
-            instance.transform.rotation = Quaternion.LookRotation(
-                parameters.LocalToWorld.GetColumn(2),
-                parameters.LocalToWorld.GetColumn(1));
+            int slot = GpuParticleVatRenderSystem.Instance.Register(
+                current.Clip,
+                parameters.LocalToWorld,
+                parameters.TimeScale,
+                parameters.SeedVariant,
+                parameters.Loop);
 
-            if (instance.TryGetComponent<GpuParticleVatRenderer>(out var vat))
+            if (slot < 0)
             {
-                vat.TimeScale = parameters.TimeScale;
-                vat.Loop = parameters.Loop;
-                vat.SetTime(0f);
-                vat.Play();
+                GpuParticleNativeFallback.Play(current, parameters.TimeScale, parameters.SeedVariant);
+                return GpuParticleHandle.Invalid;
             }
 
-            current.SuppressNativeRenderers();
-            handle = new GpuParticleHandle(instance);
+            // Re-fetch the generation assigned by the pool.
+            int generation = GpuParticleVatRenderSystem.Instance.GetGeneration(slot);
+            GpuParticleVatRenderSystem.Instance.Play(slot, generation);
+            handle = new GpuParticleHandle(slot, generation);
             return handle;
         }
 
         public void Stop(bool clear = true)
         {
-            if (handle.IsValid && handle.Target != null)
+            if (handle.IsValid)
             {
-                Object.Destroy(handle.Target);
+                GpuParticleVatRenderSystem.Instance.Unregister(handle.SlotIndex, handle.Generation);
                 handle = GpuParticleHandle.Invalid;
             }
 
@@ -74,9 +76,10 @@ namespace GpuParticle.Runtime
 
         public void Pause()
         {
-            if (handle.IsValid && handle.Target != null && handle.Target.TryGetComponent<GpuParticleVatRenderer>(out var vat))
+            // With the instanced pool, pause is implemented by setting timeScale to 0.
+            if (handle.IsValid)
             {
-                vat.Stop();
+                GpuParticleVatRenderSystem.Instance.SetTimeScale(handle.SlotIndex, handle.Generation, 0f);
             }
             else
             {
@@ -86,9 +89,9 @@ namespace GpuParticle.Runtime
 
         public void Resume()
         {
-            if (handle.IsValid && handle.Target != null && handle.Target.TryGetComponent<GpuParticleVatRenderer>(out var vat))
+            if (handle.IsValid)
             {
-                vat.Play();
+                GpuParticleVatRenderSystem.Instance.SetTimeScale(handle.SlotIndex, handle.Generation, 1f);
             }
             else
             {
@@ -103,18 +106,15 @@ namespace GpuParticle.Runtime
 
         public void SetTransform(Matrix4x4 localToWorld)
         {
-            if (handle.IsValid && handle.Target != null)
+            if (handle.IsValid)
             {
-                handle.Target.transform.position = localToWorld.GetColumn(3);
-                handle.Target.transform.rotation = Quaternion.LookRotation(
-                    localToWorld.GetColumn(2),
-                    localToWorld.GetColumn(1));
+                GpuParticleVatRenderSystem.Instance.SetTransform(handle.SlotIndex, handle.Generation, localToWorld);
             }
         }
 
         public void Prewarm()
         {
-            // VAT playback does not require prewarm; the clip assets are loaded on demand.
+            // VAT playback does not require prewarm; clip assets are loaded on demand.
         }
 
         private void OnDisable()
