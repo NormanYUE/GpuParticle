@@ -59,6 +59,7 @@ namespace GpuParticle.Runtime
                 generation = 1;
             }
 
+            GpuParticleHandle handle = new GpuParticleHandle(slot, generation);
             slots[slot] = new Instance
             {
                 Active = true,
@@ -71,9 +72,10 @@ namespace GpuParticle.Runtime
                 Generation = generation,
                 Elapsed = 0f,
                 Paused = false,
+                Handle = handle,
             };
 
-            return new GpuParticleHandle(slot, generation);
+            return handle;
         }
 
         public bool Release(GpuParticleHandle handle, out GpuParticleClip clip)
@@ -108,6 +110,17 @@ namespace GpuParticle.Runtime
             }
 
             slots[index].LocalToWorld = localToWorld;
+            return true;
+        }
+
+        public bool TryUpdateInstance(GpuParticleHandle handle, in Instance value)
+        {
+            if (!TryGetIndex(handle, out int index))
+            {
+                return false;
+            }
+
+            slots[index] = value;
             return true;
         }
 
@@ -197,6 +210,7 @@ namespace GpuParticle.Runtime
             public bool Paused;
             public uint SeedVariant;
             public uint Generation;
+            public GpuParticleHandle Handle;
 
             public ComputeBuffer ParticleStateBuffer;
             public ComputeBuffer TrailStateBuffer;
