@@ -1,24 +1,23 @@
 using System;
+using UnityEngine;
 
 namespace GpuParticle.Runtime
 {
     public readonly struct GpuParticleHandle : IEquatable<GpuParticleHandle>
     {
-        public static readonly GpuParticleHandle Invalid = new GpuParticleHandle(-1, 0);
+        public static readonly GpuParticleHandle Invalid = new GpuParticleHandle(null!);
 
-        public GpuParticleHandle(int slot, uint generation)
+        public GpuParticleHandle(GameObject target)
         {
-            Slot = slot;
-            Generation = generation;
+            Target = target;
         }
 
-        public int Slot { get; }
-        public uint Generation { get; }
-        public bool IsValid => Slot >= 0 && Generation != 0;
+        public GameObject Target { get; }
+        public bool IsValid => Target != null;
 
         public bool Equals(GpuParticleHandle other)
         {
-            return Slot == other.Slot && Generation == other.Generation;
+            return ReferenceEquals(Target, other.Target);
         }
 
         public override bool Equals(object obj)
@@ -28,15 +27,12 @@ namespace GpuParticle.Runtime
 
         public override int GetHashCode()
         {
-            unchecked
-            {
-                return (Slot * 397) ^ (int)Generation;
-            }
+            return Target != null ? Target.GetInstanceID() : 0;
         }
 
         public override string ToString()
         {
-            return IsValid ? $"{Slot}:{Generation}" : "Invalid";
+            return IsValid ? $"Vat:{Target.name}" : "Invalid";
         }
     }
 }

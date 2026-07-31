@@ -8,11 +8,8 @@ namespace GpuParticle.Runtime
         [SerializeField] private GpuParticleBinding binding = null!;
 
         private GpuParticleHandle handle = GpuParticleHandle.Invalid;
-        private bool isPaused;
-        private GpuParticleFailure pendingFailure;
-        private GpuParticleNativeRestoreState pendingRestoreState;
 
-        public bool IsPlaying => handle.IsValid || GpuParticleNativeFallback.IsAnyAlive(CurrentBinding);
+        public bool IsPlaying => handle.IsValid;
         public bool IsUsingGpu => handle.IsValid;
 
         private GpuParticleBinding CurrentBinding
@@ -30,55 +27,42 @@ namespace GpuParticle.Runtime
 
         public GpuParticleHandle Play(in GpuParticlePlayParams parameters)
         {
-            GpuParticleStartResult result = TryPlayGpu(parameters, out GpuParticleHandle gpuHandle);
-            if (result == GpuParticleStartResult.GpuStarted)
-            {
-                return gpuHandle;
-            }
-
-            GpuParticleNativeFallback.Play(CurrentBinding, parameters.TimeScale, parameters.SeedVariant);
-            return GpuParticleHandle.Invalid;
-        }
-
-        public GpuParticleStartResult TryPlayGpu(
-            in GpuParticlePlayParams parameters,
-            out GpuParticleHandle gpuHandle)
-        {
-            gpuHandle = GpuParticleHandle.Invalid;
             GpuParticleBinding current = CurrentBinding;
-            if (current == null || !current.CanAttemptGpuPlayback)
+            if (current == null || current.Clip == null || current.Clip.Prefab == null)
             {
-                pendingFailure = new GpuParticleFailure(GpuParticleFailureCode.NativeRequired, "Binding is not GPU ready.");
-                return GpuParticleStartResult.NativeRequired;
-            }
-
-            if (!current.Clip.TryValidateRuntime(out GpuParticleFailure validationFailure))
-            {
-                current.MarkRuntimeFailure(validationFailure);
-                pendingFailure = validationFailure;
-                return GpuParticleStartResult.NativeRequired;
-            }
-
-            if (!GpuParticleRuntime.TryPlay(current.Clip, this, parameters, out gpuHandle, out GpuParticleFailure startFailure))
-            {
-                current.MarkRuntimeFailure(startFailure);
-                pendingFailure = startFailure;
-                return GpuParticleStartResult.NativeRequired;
+                if (current != null)
+                {
+                    GpuParticleNativeFallback.Play(current, parameters.TimeScale, parameters.SeedVariant);
+                }
+                return GpuParticleHandle.Invalid;
             }
 
             Stop(clear: true);
-            handle = gpuHandle;
-            isPaused = false;
-            pendingFailure = GpuParticleFailure.None;
+
+            GameObject instance = Object.Instantiate(current.Clip.Prefab);
+            instance.transform.position = parameters.LocalToWorld.GetColumn(3);
+            instance.transform.rotation = Quaternion.LookRotation(
+                parameters.LocalToWorld.GetColumn(2),
+                parameters.LocalToWorld.GetColumn(1));
+
+            if (instance.TryGetComponent<GpuParticleVatRenderer>(out var vat))
+            {
+                vat.TimeScale = parameters.TimeScale;
+                vat.Loop = parameters.Loop;
+                vat.SetTime(0f);
+                vat.Play();
+            }
+
             current.SuppressNativeRenderers();
-            return GpuParticleStartResult.GpuStarted;
+            handle = new GpuParticleHandle(instance);
+            return handle;
         }
 
         public void Stop(bool clear = true)
         {
-            if (handle.IsValid)
+            if (handle.IsValid && handle.Target != null)
             {
-                GpuParticleRuntime.Stop(handle);
+                Object.Destroy(handle.Target);
                 handle = GpuParticleHandle.Invalid;
             }
 
@@ -90,10 +74,9 @@ namespace GpuParticle.Runtime
 
         public void Pause()
         {
-            isPaused = true;
-            if (handle.IsValid)
+            if (handle.IsValid && handle.Target != null && handle.Target.TryGetComponent<GpuParticleVatRenderer>(out var vat))
             {
-                GpuParticleRuntime.SetPaused(handle, true);
+                vat.Stop();
             }
             else
             {
@@ -103,10 +86,9 @@ namespace GpuParticle.Runtime
 
         public void Resume()
         {
-            isPaused = false;
-            if (handle.IsValid)
+            if (handle.IsValid && handle.Target != null && handle.Target.TryGetComponent<GpuParticleVatRenderer>(out var vat))
             {
-                GpuParticleRuntime.SetPaused(handle, false);
+                vat.Play();
             }
             else
             {
@@ -121,60 +103,18 @@ namespace GpuParticle.Runtime
 
         public void SetTransform(Matrix4x4 localToWorld)
         {
-            if (handle.IsValid)
+            if (handle.IsValid && handle.Target != null)
             {
-                GpuParticleRuntime.SetTransform(handle, localToWorld);
+                handle.Target.transform.position = localToWorld.GetColumn(3);
+                handle.Target.transform.rotation = Quaternion.LookRotation(
+                    localToWorld.GetColumn(2),
+                    localToWorld.GetColumn(1));
             }
         }
 
         public void Prewarm()
         {
-            GpuParticleBinding current = CurrentBinding;
-            if (current != null && current.CanAttemptGpuPlayback)
-            {
-                GpuParticleRuntime.AcquirePrewarm(current.Clip).Dispose();
-            }
-        }
-
-        public bool TryConsumeNativeFallbackRequest(
-            out GpuParticleFailure failure,
-            out GpuParticleNativeRestoreState restoreState)
-        {
-            if (pendingFailure.IsFailure)
-            {
-                failure = pendingFailure;
-                restoreState = pendingRestoreState;
-                pendingFailure = GpuParticleFailure.None;
-                pendingRestoreState = default;
-                return true;
-            }
-
-            failure = GpuParticleFailure.None;
-            restoreState = default;
-            return false;
-        }
-
-        internal void RequestNativeFallback(GpuParticleFailure failure, float elapsedClipTime, uint seedVariant, float timeScale)
-        {
-            if (!handle.IsValid)
-            {
-                return;
-            }
-
-            GpuParticleBinding current = CurrentBinding;
-            current?.MarkRuntimeFailure(failure);
-            pendingFailure = failure;
-            pendingRestoreState = new GpuParticleNativeRestoreState(elapsedClipTime, seedVariant, timeScale, isPaused);
-            GpuParticleRuntime.Stop(handle);
-            handle = GpuParticleHandle.Invalid;
-        }
-
-        internal void NotifyGpuStopped(GpuParticleHandle completedHandle)
-        {
-            if (handle.Equals(completedHandle))
-            {
-                handle = GpuParticleHandle.Invalid;
-            }
+            // VAT playback does not require prewarm; the clip assets are loaded on demand.
         }
 
         private void OnDisable()
