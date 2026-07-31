@@ -159,6 +159,14 @@ namespace GpuParticle.Runtime
 
         public void Clear()
         {
+            for (int i = 0; i < slots.Length; i++)
+            {
+                if (slots[i].Active)
+                {
+                    ReleaseInstanceBuffers(ref slots[i]);
+                }
+            }
+
             freeCount = 0;
             for (int i = slots.Length - 1; i >= 0; i--)
             {
@@ -192,10 +200,21 @@ namespace GpuParticle.Runtime
 
         private void ReleaseIndex(int index)
         {
+            ReleaseInstanceBuffers(ref slots[index]);
             slots[index].Active = false;
             slots[index].Clip = null!;
             slots[index].Owner = null!;
             freeStack[freeCount++] = index;
+        }
+
+        private static void ReleaseInstanceBuffers(ref Instance instance)
+        {
+            instance.ParticleStateBuffer?.Release();
+            instance.TrailStateBuffer?.Release();
+            instance.MeshTransformBuffer?.Release();
+            instance.ParticleStateBuffer = null!;
+            instance.TrailStateBuffer = null!;
+            instance.MeshTransformBuffer = null!;
         }
 
         internal struct Instance

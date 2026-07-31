@@ -185,17 +185,11 @@ namespace GpuParticle.Runtime
             int particleIndex = 0;
             int trailIndex = 0;
             int meshIndex = 0;
-            int frameIndexKey = -1;
             for (int t = 0; t < tracks.Length; t++)
             {
                 GpuParticleGeometryTrack track = tracks[t];
                 (GpuParticleGeometryFrame frameA, GpuParticleGeometryFrame? frameB, float lerpT) =
                     FindSurroundingFrames(track, instance.Elapsed);
-
-                if (frameIndexKey < 0)
-                {
-                    frameIndexKey = Array.IndexOf(track.Frames, frameA);
-                }
 
                 if (frameA.ParticleCount > 0 && interpolatedParticles != null)
                 {
@@ -231,14 +225,9 @@ namespace GpuParticle.Runtime
                 }
             }
 
-            if (frameIndexKey < 0)
-            {
-                frameIndexKey = 0;
-            }
-
-            instance.ParticleStateBuffer = UploadParticleStates(clip, frameIndexKey, interpolatedParticles)!;
-            instance.TrailStateBuffer = UploadTrailStates(clip, frameIndexKey, interpolatedTrails)!;
-            instance.MeshTransformBuffer = UploadMeshTransforms(clip, frameIndexKey, interpolatedMeshes)!;
+            instance.ParticleStateBuffer = UploadParticleStates(instance.ParticleStateBuffer, interpolatedParticles)!;
+            instance.TrailStateBuffer = UploadTrailStates(instance.TrailStateBuffer, interpolatedTrails)!;
+            instance.MeshTransformBuffer = UploadMeshTransforms(instance.MeshTransformBuffer, interpolatedMeshes)!;
         }
 
         private static void ReadAllBlobArrays(
@@ -447,49 +436,60 @@ namespace GpuParticle.Runtime
             }
         }
 
-        private ComputeBuffer? UploadParticleStates(
-            GpuParticleClip clip,
-            int frameIndex,
+        private static ComputeBuffer? UploadParticleStates(
+            ComputeBuffer? existing,
             ShaderParticleState[]? states)
         {
             if (states == null || states.Length == 0)
             {
+                existing?.Release();
                 return null;
             }
 
-            ComputeBuffer buffer = bufferCache.GetOrCreateParticleStateBuffer(clip, frameIndex, states.Length);
+            ComputeBuffer buffer = GetOrResizeBuffer(existing, states.Length, 64);
             buffer.SetData(states);
             return buffer;
         }
 
-        private ComputeBuffer? UploadTrailStates(
-            GpuParticleClip clip,
-            int frameIndex,
+        private static ComputeBuffer? UploadTrailStates(
+            ComputeBuffer? existing,
             ShaderTrailState[]? states)
         {
             if (states == null || states.Length == 0)
             {
+                existing?.Release();
                 return null;
             }
 
-            ComputeBuffer buffer = bufferCache.GetOrCreateTrailStateBuffer(clip, frameIndex, states.Length);
+            ComputeBuffer buffer = GetOrResizeBuffer(existing, states.Length, 32);
             buffer.SetData(states);
             return buffer;
         }
 
-        private ComputeBuffer? UploadMeshTransforms(
-            GpuParticleClip clip,
-            int frameIndex,
+        private static ComputeBuffer? UploadMeshTransforms(
+            ComputeBuffer? existing,
             ShaderMeshTransform[]? transforms)
         {
             if (transforms == null || transforms.Length == 0)
             {
+                existing?.Release();
                 return null;
             }
 
-            ComputeBuffer buffer = bufferCache.GetOrCreateMeshTransformBuffer(clip, frameIndex, transforms.Length);
+            ComputeBuffer buffer = GetOrResizeBuffer(existing, transforms.Length, 48);
             buffer.SetData(transforms);
             return buffer;
+        }
+
+        private static ComputeBuffer GetOrResizeBuffer(ComputeBuffer? existing, int count, int stride)
+        {
+            if (existing != null && existing.count == count)
+            {
+                return existing;
+            }
+
+            existing?.Release();
+            return new ComputeBuffer(count, stride);
         }
 
         private static GpuParticleBlobTrailState Lerp(in GpuParticleBlobTrailState a, in GpuParticleBlobTrailState b, float t)
