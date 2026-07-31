@@ -251,6 +251,39 @@ namespace GpuParticle.Runtime
                     {
                         material = new Material(renderer.sharedMaterial);
                         material.enableInstancing = true;
+
+                        if (clip.PositionSizeTexture != null)
+                        {
+                            material.SetTexture("_PositionSizeTex", clip.PositionSizeTexture);
+                        }
+
+                        if (clip.ColorTexture != null)
+                        {
+                            material.SetTexture("_ColorTex", clip.ColorTexture);
+                        }
+
+                        if (clip.RotationTexture != null)
+                        {
+                            material.SetTexture("_RotationTex", clip.RotationTexture);
+                        }
+
+                        if (clip.VelocityLifetimeTexture != null)
+                        {
+                            material.SetTexture("_VelocityLifetimeTex", clip.VelocityLifetimeTexture);
+                        }
+
+                        if (clip.PositionSizeTexture != null)
+                        {
+                            Vector2 texelSize = new Vector2(
+                                1f / Mathf.Max(1, clip.PositionSizeTexture.width),
+                                1f / Mathf.Max(1, clip.PositionSizeTexture.height));
+                            material.SetVector(
+                                "_TexelSize",
+                                new Vector4(texelSize.x, texelSize.y, clip.PositionSizeTexture.width, clip.PositionSizeTexture.height));
+                        }
+
+                        material.SetFloat("_Duration", clip.Duration);
+                        material.SetFloat("_FrameCount", clip.FrameCount);
                     }
                 }
 
