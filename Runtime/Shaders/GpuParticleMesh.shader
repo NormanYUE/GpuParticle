@@ -26,6 +26,7 @@ Shader "GpuParticle/Mesh"
             };
 
             StructuredBuffer<MeshTransform> _MeshTransforms;
+            sampler2D _MainTex;
             float4x4 _LocalToWorld;
 
             struct appdata
