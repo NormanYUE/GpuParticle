@@ -124,6 +124,19 @@ namespace GpuParticle.Runtime
 
         private void OnBeginCameraRendering(ScriptableRenderContext context, Camera camera)
         {
+            CameraType type = camera.cameraType;
+            if (type != CameraType.Game && type != CameraType.SceneView)
+            {
+                return;
+            }
+
+#if UNITY_EDITOR
+            if (Application.isPlaying && type == CameraType.SceneView)
+            {
+                return;
+            }
+#endif
+
             Render();
         }
 
@@ -177,8 +190,10 @@ namespace GpuParticle.Runtime
         {
             private readonly GpuParticleClip clip;
             private readonly List<GpuParticleInstanceData> instanceData = new List<GpuParticleInstanceData>();
+            private readonly MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
             private GraphicsBuffer? instanceBuffer;
             private Material? material;
+            private int lastInstanceCount;
 
             public BatchData(GpuParticleClip clip)
             {
@@ -212,8 +227,8 @@ namespace GpuParticle.Runtime
                 EnsureBuffer(count);
                 instanceBuffer!.SetData(instanceData);
 
-                MaterialPropertyBlock mpb = new MaterialPropertyBlock();
-                mpb.SetBuffer("_InstanceDataBuffer", instanceBuffer);
+                propertyBlock.Clear();
+                propertyBlock.SetBuffer("_InstanceDataBuffer", instanceBuffer);
 
                 Bounds bounds = TransformBounds(clip.LocalBounds, clip.Prefab.transform.localToWorldMatrix);
 
@@ -223,12 +238,14 @@ namespace GpuParticle.Runtime
                     mat,
                     bounds,
                     count,
-                    mpb,
+                    propertyBlock,
                     ShadowCastingMode.Off,
                     false,
                     0,
                     null,
                     LightProbeUsage.Off);
+
+                lastInstanceCount = count;
             }
 
             private Mesh GetMesh()
@@ -298,23 +315,26 @@ namespace GpuParticle.Runtime
                 Vector3 min = matrix.MultiplyPoint3x4(center + new Vector3(-extents.x, -extents.y, -extents.z));
                 Vector3 max = min;
 
-                Vector3[] corners =
-                {
-                    center + new Vector3(extents.x, -extents.y, -extents.z),
-                    center + new Vector3(-extents.x, extents.y, -extents.z),
-                    center + new Vector3(extents.x, extents.y, -extents.z),
-                    center + new Vector3(-extents.x, -extents.y, extents.z),
-                    center + new Vector3(extents.x, -extents.y, extents.z),
-                    center + new Vector3(-extents.x, extents.y, extents.z),
-                    center + new Vector3(extents.x, extents.y, extents.z),
-                };
+                min = Vector3.Min(min, matrix.MultiplyPoint3x4(center + new Vector3(extents.x, -extents.y, -extents.z)));
+                max = Vector3.Max(max, matrix.MultiplyPoint3x4(center + new Vector3(extents.x, -extents.y, -extents.z)));
 
-                foreach (Vector3 corner in corners)
-                {
-                    Vector3 worldCorner = matrix.MultiplyPoint3x4(corner);
-                    min = Vector3.Min(min, worldCorner);
-                    max = Vector3.Max(max, worldCorner);
-                }
+                min = Vector3.Min(min, matrix.MultiplyPoint3x4(center + new Vector3(-extents.x, extents.y, -extents.z)));
+                max = Vector3.Max(max, matrix.MultiplyPoint3x4(center + new Vector3(-extents.x, extents.y, -extents.z)));
+
+                min = Vector3.Min(min, matrix.MultiplyPoint3x4(center + new Vector3(extents.x, extents.y, -extents.z)));
+                max = Vector3.Max(max, matrix.MultiplyPoint3x4(center + new Vector3(extents.x, extents.y, -extents.z)));
+
+                min = Vector3.Min(min, matrix.MultiplyPoint3x4(center + new Vector3(-extents.x, -extents.y, extents.z)));
+                max = Vector3.Max(max, matrix.MultiplyPoint3x4(center + new Vector3(-extents.x, -extents.y, extents.z)));
+
+                min = Vector3.Min(min, matrix.MultiplyPoint3x4(center + new Vector3(extents.x, -extents.y, extents.z)));
+                max = Vector3.Max(max, matrix.MultiplyPoint3x4(center + new Vector3(extents.x, -extents.y, extents.z)));
+
+                min = Vector3.Min(min, matrix.MultiplyPoint3x4(center + new Vector3(-extents.x, extents.y, extents.z)));
+                max = Vector3.Max(max, matrix.MultiplyPoint3x4(center + new Vector3(-extents.x, extents.y, extents.z)));
+
+                min = Vector3.Min(min, matrix.MultiplyPoint3x4(center + new Vector3(extents.x, extents.y, extents.z)));
+                max = Vector3.Max(max, matrix.MultiplyPoint3x4(center + new Vector3(extents.x, extents.y, extents.z)));
 
                 return new Bounds((min + max) * 0.5f, max - min);
             }
