@@ -57,11 +57,16 @@ Shader "GpuParticle/Mesh"
                 #endif
             }
 
+            float3 QuaternionRotate(float4 q, float3 v)
+            {
+                float3 t = 2.0 * cross(q.xyz, v);
+                return v + q.w * t + cross(q.xyz, t);
+            }
+
             v2f vert(appdata v, uint instanceID : SV_InstanceID)
             {
                 MeshTransform t = _MeshTransforms[instanceID];
-                float3 pos = v.vertex.xyz * t.scale + t.position;
-                // 简化：忽略 rotation 处理，先实现位置+缩放
+                float3 pos = QuaternionRotate(t.rotation, v.vertex.xyz * t.scale) + t.position;
 
                 v2f o;
                 o.vertex = mul(UNITY_MATRIX_VP, mul(_LocalToWorld, float4(pos, 1)));
