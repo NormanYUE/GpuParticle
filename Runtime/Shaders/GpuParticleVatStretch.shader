@@ -104,7 +104,7 @@ Shader "GpuParticle/VatStretch"
                 float3 stretchDir = normalize(worldVel + 0.0001);
                 float stretchLen = length(worldVel) * _StretchScale;
 
-                float3 viewRight = UNITY_MATRIX_IT_MV[0].xyz;
+                float3 viewRight = normalize(UNITY_MATRIX_I_V._11_21_31);
 
                 float2 quadUv = v.uv0;
                 float3 corner = center

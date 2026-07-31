@@ -91,9 +91,9 @@ Shader "GpuParticle/VatBillboard"
                 float3 center = mul(_LocalToWorld, float4(posSize.xyz, 1)).xyz;
                 float size = posSize.w;
 
-                // View-space billboard basis
-                float3 viewRight = UNITY_MATRIX_IT_MV[0].xyz;
-                float3 viewUp = UNITY_MATRIX_IT_MV[1].xyz;
+                // World-space camera basis (URP)
+                float3 viewRight = normalize(UNITY_MATRIX_I_V._11_21_31);
+                float3 viewUp = normalize(UNITY_MATRIX_I_V._12_22_32);
 
                 float2 quadUv = v.uv0;
                 float3 corner = center
