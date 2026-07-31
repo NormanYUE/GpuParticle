@@ -23,6 +23,7 @@ Shader "GpuParticle/Trail"
             };
 
             StructuredBuffer<TrailState> _TrailStates;
+            sampler2D _MainTex;
             float4x4 _LocalToWorld;
 
             struct v2f { float4 vertex : SV_POSITION; float4 color : COLOR; float2 uv : TEXCOORD0; };

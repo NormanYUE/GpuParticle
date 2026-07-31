@@ -26,6 +26,7 @@ Shader "GpuParticle/Stretch"
             };
 
             StructuredBuffer<ParticleState> _ParticleStates;
+            sampler2D _MainTex;
             float4x4 _LocalToWorld;
             float3 _CameraRight;
             float _StretchScale;
