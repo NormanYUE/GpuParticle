@@ -13,6 +13,7 @@ namespace GpuParticle.Tests
             Run("crc mismatch is rejected", CrcMismatchIsRejected);
             Run("file content hash changes with file bytes", FileContentHashChangesWithFileBytes);
             BlobRoundtripTests.RunAll();
+            StateInterpolationTests.RunAll();
             Console.WriteLine("All tests passed.");
             return 0;
         }
