@@ -5,6 +5,7 @@ namespace GpuParticle.Runtime
 {
     public sealed class GpuParticleClip : ScriptableObject
     {
+        // Legacy fields (kept to avoid asset deserialization issues during migration)
         [SerializeField] private int schemaVersion = GpuParticleBlobFormat.SchemaVersion;
         [SerializeField] private string sourcePrefabGuid = string.Empty;
         [SerializeField] private string sourceContentHash = string.Empty;
@@ -18,6 +19,15 @@ namespace GpuParticle.Runtime
         [SerializeField] private TextAsset payload = null!;
         [SerializeField] private GpuParticleRuntimeResources runtimeResources = null!;
         [SerializeField] private GpuParticleGeometryTrack[] geometryTracks = Array.Empty<GpuParticleGeometryTrack>();
+
+        // VAT + MeshRenderer Prefab fields
+        [SerializeField] private GameObject prefab = null!;
+        [SerializeField] private int frameCount;
+        [SerializeField] private int maxParticles;
+        [SerializeField] private Texture2D positionSizeTexture = null!;
+        [SerializeField] private Texture2D colorTexture = null!;
+        [SerializeField] private Texture2D rotationTexture = null!;
+        [SerializeField] private Texture2D velocityLifetimeTexture = null!;
 
         public int SchemaVersion => schemaVersion;
         public string SourcePrefabGuid => sourcePrefabGuid;
@@ -33,6 +43,14 @@ namespace GpuParticle.Runtime
         public GpuParticleRuntimeResources RuntimeResources => runtimeResources;
         public GpuParticleGeometryTrack[] GeometryTracks => geometryTracks;
         public int GeometryTrackCount => geometryTracks?.Length ?? 0;
+
+        public GameObject Prefab => prefab;
+        public int FrameCount => frameCount;
+        public int MaxParticles => maxParticles;
+        public Texture2D PositionSizeTexture => positionSizeTexture;
+        public Texture2D ColorTexture => colorTexture;
+        public Texture2D RotationTexture => rotationTexture;
+        public Texture2D VelocityLifetimeTexture => velocityLifetimeTexture;
 
         public void Configure(
             string prefabGuid,
@@ -63,8 +81,38 @@ namespace GpuParticle.Runtime
             geometryTracks = tracks ?? Array.Empty<GpuParticleGeometryTrack>();
         }
 
+        public void ConfigureVat(
+            GameObject prefabAsset,
+            float clipDuration,
+            int clipFrameCount,
+            int clipMaxParticles,
+            Bounds bounds,
+            Texture2D posSizeTex,
+            Texture2D colorTex,
+            Texture2D rotTex,
+            Texture2D velLifeTex)
+        {
+            prefab = prefabAsset;
+            duration = Mathf.Max(0f, clipDuration);
+            frameCount = Mathf.Max(1, clipFrameCount);
+            maxParticles = Mathf.Max(0, clipMaxParticles);
+            localBounds = bounds;
+            positionSizeTexture = posSizeTex;
+            colorTexture = colorTex;
+            rotationTexture = rotTex;
+            velocityLifetimeTexture = velLifeTex;
+            status = prefabAsset != null ? GpuParticleBakeStatus.GpuReady : GpuParticleBakeStatus.Native;
+        }
+
         public bool TryValidateRuntime(out GpuParticleFailure failure)
         {
+            if (prefab != null)
+            {
+                failure = GpuParticleFailure.None;
+                return true;
+            }
+
+            // Legacy validation path (will be removed once migration is complete)
             if (status != GpuParticleBakeStatus.GpuReady)
             {
                 failure = new GpuParticleFailure(GpuParticleFailureCode.ClipNative, "Clip is marked Native.");
