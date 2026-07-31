@@ -24,8 +24,13 @@ Shader "GpuParticle/VatMesh"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
+            #pragma instancing_options procedural:SetupProcVertex
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            void SetupProcVertex()
+            {
+            }
 
             TEXTURE2D(_PositionSizeTex);
             SAMPLER(sampler_PositionSizeTex);
@@ -79,9 +84,9 @@ Shader "GpuParticle/VatMesh"
                 return v + q.w * t + cross(q.xyz, t);
             }
 
-            v2f vert(appdata v)
+            v2f vert(appdata v, uint instanceID : SV_InstanceID)
             {
-                InstanceData inst = _InstanceDataBuffer[unity_InstanceID];
+                InstanceData inst = _InstanceDataBuffer[instanceID];
                 uint particleIndex = (uint)(v.uv1.x + 0.5);
 
                 float nt = inst.elapsedTime / max(_Duration, 0.0001);

@@ -28,9 +28,14 @@ Shader "GpuParticle/VatBillboard"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
+            #pragma instancing_options procedural:SetupProcVertex
             #pragma multi_compile_local _ ALIGNMENT_VIEW ALIGNMENT_FACING ALIGNMENT_WORLD ALIGNMENT_LOCAL
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            void SetupProcVertex()
+            {
+            }
 
             TEXTURE2D(_PositionSizeTex);
             SAMPLER(sampler_PositionSizeTex);
@@ -76,9 +81,9 @@ Shader "GpuParticle/VatBillboard"
                 return float2(u, v);
             }
 
-            v2f vert(appdata v)
+            v2f vert(appdata v, uint instanceID : SV_InstanceID)
             {
-                InstanceData inst = _InstanceDataBuffer[unity_InstanceID];
+                InstanceData inst = _InstanceDataBuffer[instanceID];
                 uint particleIndex = (uint)(v.uv1.x + 0.5);
 
                 float nt = inst.elapsedTime / max(_Duration, 0.0001);
