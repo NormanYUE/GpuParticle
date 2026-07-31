@@ -2,8 +2,11 @@ using UnityEngine;
 
 namespace GpuParticle.Runtime
 {
+    // Retained for prefab compatibility and editor preview.
+    // Runtime playback is now handled by GpuParticleVatRenderSystem for instanced batching.
     [DisallowMultipleComponent]
     [RequireComponent(typeof(MeshRenderer))]
+    [System.Obsolete("Use GpuParticleVatRenderSystem for runtime playback. This component is kept for prefab compatibility.")]
     public sealed class GpuParticleVatRenderer : MonoBehaviour
     {
         private static readonly int ElapsedTimeId = Shader.PropertyToID("_ElapsedTime");
