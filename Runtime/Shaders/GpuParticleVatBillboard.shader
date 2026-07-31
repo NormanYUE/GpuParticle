@@ -27,6 +27,7 @@ Shader "GpuParticle/VatBillboard"
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            #pragma multi_compile_instancing
             #pragma multi_compile_local _ ALIGNMENT_VIEW ALIGNMENT_FACING ALIGNMENT_WORLD ALIGNMENT_LOCAL
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
@@ -39,12 +40,20 @@ Shader "GpuParticle/VatBillboard"
             SAMPLER(sampler_MainTex);
 
             CBUFFER_START(UnityPerMaterial)
-                float _ElapsedTime;
                 float _Duration;
                 float _FrameCount;
                 float4 _TexelSize;
-                float4x4 _LocalToWorld;
             CBUFFER_END
+
+            struct InstanceData
+            {
+                float4x4 localToWorld;
+                float elapsedTime;
+                float timeScale;
+                uint seedVariant;
+            };
+
+            StructuredBuffer<InstanceData> _InstanceDataBuffer;
 
             struct appdata
             {
@@ -69,9 +78,10 @@ Shader "GpuParticle/VatBillboard"
 
             v2f vert(appdata v)
             {
+                InstanceData inst = _InstanceDataBuffer[unity_InstanceID];
                 uint particleIndex = (uint)(v.uv1.x + 0.5);
 
-                float nt = _ElapsedTime / max(_Duration, 0.0001);
+                float nt = inst.elapsedTime / max(_Duration, 0.0001);
                 float frameF = nt * (_FrameCount - 1);
                 uint frameA = (uint)frameF;
                 uint frameB = min(frameA + 1, (uint)_FrameCount - 1);
@@ -88,7 +98,7 @@ Shader "GpuParticle/VatBillboard"
                 float4 colorB = SAMPLE_TEXTURE2D_LOD(_ColorTex, sampler_ColorTex, uvB, 0);
                 float4 color = lerp(colorA, colorB, t);
 
-                float3 center = mul(_LocalToWorld, float4(posSize.xyz, 1)).xyz;
+                float3 center = mul(inst.localToWorld, float4(posSize.xyz, 1)).xyz;
                 float size = posSize.w;
 
                 // World-space camera basis (URP)
