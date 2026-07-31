@@ -23,6 +23,7 @@ Shader "GpuParticle/VatMesh"
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            #pragma multi_compile_instancing
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
@@ -36,12 +37,20 @@ Shader "GpuParticle/VatMesh"
             SAMPLER(sampler_MainTex);
 
             CBUFFER_START(UnityPerMaterial)
-                float _ElapsedTime;
                 float _Duration;
                 float _FrameCount;
                 float4 _TexelSize;
-                float4x4 _LocalToWorld;
             CBUFFER_END
+
+            struct InstanceData
+            {
+                float4x4 localToWorld;
+                float elapsedTime;
+                float timeScale;
+                uint seedVariant;
+            };
+
+            StructuredBuffer<InstanceData> _InstanceDataBuffer;
 
             struct appdata
             {
@@ -72,9 +81,10 @@ Shader "GpuParticle/VatMesh"
 
             v2f vert(appdata v)
             {
+                InstanceData inst = _InstanceDataBuffer[unity_InstanceID];
                 uint particleIndex = (uint)(v.uv1.x + 0.5);
 
-                float nt = _ElapsedTime / max(_Duration, 0.0001);
+                float nt = inst.elapsedTime / max(_Duration, 0.0001);
                 float frameF = nt * (_FrameCount - 1);
                 uint frameA = (uint)frameF;
                 uint frameB = min(frameA + 1, (uint)_FrameCount - 1);
@@ -96,7 +106,7 @@ Shader "GpuParticle/VatMesh"
                 float4 rot = normalize(lerp(rotA, rotB, t));
 
                 float3 localPos = RotateVector(v.vertex.xyz * posSize.w, rot) + posSize.xyz;
-                float3 worldPos = mul(_LocalToWorld, float4(localPos, 1)).xyz;
+                float3 worldPos = mul(inst.localToWorld, float4(localPos, 1)).xyz;
 
                 v2f o;
                 o.positionCS = TransformWorldToHClip(worldPos);

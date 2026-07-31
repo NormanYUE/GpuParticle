@@ -29,6 +29,7 @@ Shader "GpuParticle/VatStretch"
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            #pragma multi_compile_instancing
             #pragma multi_compile_local _ ALIGNMENT_VIEW ALIGNMENT_FACING ALIGNMENT_WORLD ALIGNMENT_LOCAL
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
@@ -43,13 +44,21 @@ Shader "GpuParticle/VatStretch"
             SAMPLER(sampler_MainTex);
 
             CBUFFER_START(UnityPerMaterial)
-                float _ElapsedTime;
                 float _Duration;
                 float _FrameCount;
                 float4 _TexelSize;
-                float4x4 _LocalToWorld;
                 float _StretchScale;
             CBUFFER_END
+
+            struct InstanceData
+            {
+                float4x4 localToWorld;
+                float elapsedTime;
+                float timeScale;
+                uint seedVariant;
+            };
+
+            StructuredBuffer<InstanceData> _InstanceDataBuffer;
 
             struct appdata
             {
@@ -74,9 +83,10 @@ Shader "GpuParticle/VatStretch"
 
             v2f vert(appdata v)
             {
+                InstanceData inst = _InstanceDataBuffer[unity_InstanceID];
                 uint particleIndex = (uint)(v.uv1.x + 0.5);
 
-                float nt = _ElapsedTime / max(_Duration, 0.0001);
+                float nt = inst.elapsedTime / max(_Duration, 0.0001);
                 float frameF = nt * (_FrameCount - 1);
                 uint frameA = (uint)frameF;
                 uint frameB = min(frameA + 1, (uint)_FrameCount - 1);
@@ -97,14 +107,14 @@ Shader "GpuParticle/VatStretch"
                 float4 velLifeB = SAMPLE_TEXTURE2D_LOD(_VelocityLifetimeTex, sampler_VelocityLifetimeTex, uvB, 0);
                 float4 velLife = lerp(velLifeA, velLifeB, t);
 
-                float3 center = mul(_LocalToWorld, float4(posSize.xyz, 1)).xyz;
+                float3 center = mul(inst.localToWorld, float4(posSize.xyz, 1)).xyz;
                 float size = posSize.w;
 
-                float3 worldVel = mul(_LocalToWorld, float4(velLife.xyz, 0)).xyz;
+                float3 worldVel = mul(inst.localToWorld, float4(velLife.xyz, 0)).xyz;
                 float3 stretchDir = normalize(worldVel + 0.0001);
                 float stretchLen = length(worldVel) * _StretchScale;
 
-                float3 viewRight = UNITY_MATRIX_IT_MV[0].xyz;
+                float3 viewRight = normalize(UNITY_MATRIX_I_V._11_21_31);
 
                 float2 quadUv = v.uv0;
                 float3 corner = center
