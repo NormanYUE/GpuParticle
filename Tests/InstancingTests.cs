@@ -12,7 +12,8 @@ namespace GpuParticle.Tests
         {
             Run("allocate and free slot", AllocateAndFreeSlot);
             Run("generation prevents stale handle", GenerationPreventsStaleHandle);
-            Run("pool capacity caps allocation", PoolCapacityCapsAllocation);
+            Run("pool grows beyond initial capacity", PoolGrowsBeyondInitialCapacity);
+            Run("pool capacity caps at max capacity", PoolCapacityCapsAtMaxCapacity);
             Run("update advances elapsed time", UpdateAdvancesElapsedTime);
         }
 
@@ -75,17 +76,51 @@ namespace GpuParticle.Tests
             }
         }
 
-        private static void PoolCapacityCapsAllocation()
+        private static void PoolGrowsBeyondInitialCapacity()
         {
             var pool = new GpuParticleInstancePool(2);
             GpuParticleClip clip = CreateTestClip(1f);
 
-            pool.Allocate(clip, Matrix4x4.identity, 1f, 0u, true);
-            pool.Allocate(clip, Matrix4x4.identity, 1f, 0u, true);
-            int index = pool.Allocate(clip, Matrix4x4.identity, 1f, 0u, true);
-            if (index >= 0)
+            int first = pool.Allocate(clip, Matrix4x4.identity, 1f, 0u, true);
+            int second = pool.Allocate(clip, Matrix4x4.identity, 1f, 0u, true);
+            int third = pool.Allocate(clip, Matrix4x4.identity, 1f, 0u, true);
+            if (third < 0)
             {
-                throw new Exception("Expected allocation to fail at capacity.");
+                throw new Exception("Expected pool to grow beyond initial capacity.");
+            }
+
+            if (pool.Capacity <= 2)
+            {
+                throw new Exception($"Expected capacity to grow, got {pool.Capacity}.");
+            }
+
+            // Verify all three slots are independently alive.
+            if (!pool.IsAlive(first, pool.GetGeneration(first)) ||
+                !pool.IsAlive(second, pool.GetGeneration(second)) ||
+                !pool.IsAlive(third, pool.GetGeneration(third)))
+            {
+                throw new Exception("Expected all grown slots to be alive.");
+            }
+        }
+
+        private static void PoolCapacityCapsAtMaxCapacity()
+        {
+            var pool = new GpuParticleInstancePool(GpuParticleInstancePool.MaxCapacity);
+            GpuParticleClip clip = CreateTestClip(1f);
+
+            for (int i = 0; i < GpuParticleInstancePool.MaxCapacity; i++)
+            {
+                int index = pool.Allocate(clip, Matrix4x4.identity, 1f, 0u, true);
+                if (index < 0)
+                {
+                    throw new Exception($"Expected allocation {i} to succeed at max capacity.");
+                }
+            }
+
+            int overflow = pool.Allocate(clip, Matrix4x4.identity, 1f, 0u, true);
+            if (overflow >= 0)
+            {
+                throw new Exception("Expected allocation to fail beyond max capacity.");
             }
         }
 

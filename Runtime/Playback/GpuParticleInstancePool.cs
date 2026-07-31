@@ -43,6 +43,11 @@ namespace GpuParticle.Runtime
             {
                 index = aliveCount++;
             }
+            else if (slots.Length < MaxCapacity)
+            {
+                Grow(Mathf.Min(slots.Length * 2, MaxCapacity));
+                index = aliveCount++;
+            }
             else
             {
                 return -1;
@@ -112,6 +117,13 @@ namespace GpuParticle.Runtime
             }
 
             return slots[index].Generation;
+        }
+
+        private void Grow(int newCapacity)
+        {
+            newCapacity = Mathf.Clamp(newCapacity, slots.Length + 1, MaxCapacity);
+            Array.Resize(ref slots, newCapacity);
+            Array.Resize(ref freeList, newCapacity);
         }
 
         public void UpdateAll(float deltaTime)
