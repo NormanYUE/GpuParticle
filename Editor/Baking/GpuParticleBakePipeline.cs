@@ -696,17 +696,20 @@ namespace GpuParticle.Editor
 
             Array.Sort(particles, 0, count, Comparer<ParticleSystem.Particle>.Create((a, b) => a.randomSeed.CompareTo(b.randomSeed)));
 
+            Transform systemTransform = system.transform;
+            Quaternion systemRotationInv = Quaternion.Inverse(systemTransform.rotation);
             var states = new GpuParticleBlobParticleState[count];
             for (int i = 0; i < count; i++)
             {
                 ParticleSystem.Particle p = particles[i];
                 Quaternion rotation = Quaternion.Euler(p.rotation3D);
+                Quaternion localRotation = systemRotationInv * rotation;
                 states[i] = new GpuParticleBlobParticleState
                 {
-                    Position = p.position,
-                    Velocity = p.velocity,
+                    Position = systemTransform.InverseTransformPoint(p.position),
+                    Velocity = systemTransform.InverseTransformDirection(p.velocity),
                     Size = p.GetCurrentSize3D(system).x,
-                    Rotation = new Vector4(rotation.x, rotation.y, rotation.z, rotation.w),
+                    Rotation = new Vector4(localRotation.x, localRotation.y, localRotation.z, localRotation.w),
                     Color = p.GetCurrentColor(system),
                     Lifetime = 1f - p.remainingLifetime / Mathf.Max(p.startLifetime, 0.0001f),
                     Seed = p.randomSeed,
