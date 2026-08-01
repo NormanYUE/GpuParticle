@@ -110,9 +110,28 @@ namespace GpuParticle.Editor
                 return WriteNativeBinding(prefab, prefabPath, report.Failure);
             }
 
-            GpuParticleBindingWriter.WriteBinding(prefab, GpuParticleBakeStatus.GpuReady, clip, string.Empty);
-            AssetDatabase.ImportAsset(prefabPath, ImportAssetOptions.ForceSynchronousImport);
-            return new GpuParticleValidationResult(prefabPath, GpuParticleBakeStatus.GpuReady, GpuParticleFailure.None, clip);
+            (GpuParticleNativeSystemState[] systemStates, GpuParticleNativeRendererState[] rendererStates) =
+                CaptureAllNativeStates(instance);
+
+            BakedSystemEntry entry = new BakedSystemEntry(
+                string.Empty,
+                clip,
+                systemStates,
+                rendererStates);
+
+            GameObject? runtimePrefab = GpuParticleRuntimePrefabBuilder.Build(prefab, settings, new[] { entry });
+            if (runtimePrefab == null)
+            {
+                report.Fail(GpuParticleFailureCode.RuntimeGpuFailure, "Failed to build runtime prefab.", prefabPath);
+                return WriteNativeBinding(prefab, prefabPath, report.Failure);
+            }
+
+            return new GpuParticleValidationResult(
+                prefabPath,
+                GpuParticleBakeStatus.GpuReady,
+                GpuParticleFailure.None,
+                clip,
+                runtimePrefab);
         }
 
         public static GpuParticleValidationResult BakePrefabGroup(GameObject prefab)
@@ -356,6 +375,31 @@ namespace GpuParticle.Editor
 
             ParticleSystem[] systems = target.GetComponents<ParticleSystem>();
             ParticleSystemRenderer[] renderers = target.GetComponents<ParticleSystemRenderer>();
+
+            GpuParticleNativeSystemState[] systemStates = new GpuParticleNativeSystemState[systems.Length];
+            for (int i = 0; i < systems.Length; i++)
+            {
+                GpuParticleNativeSystemState state = new GpuParticleNativeSystemState();
+                state.Capture(systems[i]);
+                systemStates[i] = state;
+            }
+
+            GpuParticleNativeRendererState[] rendererStates = new GpuParticleNativeRendererState[renderers.Length];
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                GpuParticleNativeRendererState state = new GpuParticleNativeRendererState();
+                state.Capture(renderers[i]);
+                rendererStates[i] = state;
+            }
+
+            return (systemStates, rendererStates);
+        }
+
+        private static (GpuParticleNativeSystemState[] systems, GpuParticleNativeRendererState[] renderers)
+            CaptureAllNativeStates(GameObject root)
+        {
+            ParticleSystem[] systems = root.GetComponentsInChildren<ParticleSystem>(true);
+            ParticleSystemRenderer[] renderers = root.GetComponentsInChildren<ParticleSystemRenderer>(true);
 
             GpuParticleNativeSystemState[] systemStates = new GpuParticleNativeSystemState[systems.Length];
             for (int i = 0; i < systems.Length; i++)
