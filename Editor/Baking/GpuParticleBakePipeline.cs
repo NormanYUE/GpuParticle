@@ -221,11 +221,10 @@ namespace GpuParticle.Editor
                 Mesh mesh = BuildVatMesh(data);
                 Material material = CreateVatMaterial(data);
 
-                string systemName = GetTransformPath(instance.transform, entry.Key.transform);
-                if (string.IsNullOrEmpty(systemName))
-                {
-                    systemName = entry.Key.gameObject.name;
-                }
+                string transformPath = GetTransformPath(instance.transform, entry.Key.transform);
+                string systemName = string.IsNullOrEmpty(transformPath)
+                    ? entry.Key.gameObject.name
+                    : transformPath;
 
                 GpuParticleClip clip = WriteVatAssets(
                     prefab,
@@ -242,10 +241,10 @@ namespace GpuParticle.Editor
                 if (clip != null)
                 {
                     (GpuParticleNativeSystemState[] systemStates, GpuParticleNativeRendererState[] rendererStates) =
-                        CaptureNativeStatesAtPath(instance, systemName);
+                        CaptureNativeStatesAtPath(instance, transformPath);
 
                     entries.Add(new BakedSystemEntry(
-                        systemName,
+                        transformPath,
                         clip,
                         systemStates,
                         rendererStates));
