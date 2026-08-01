@@ -15,6 +15,7 @@ namespace GpuParticle.Runtime
         public int SortingLayerValue => GetSortingLayerValue();
         public int SortingOrder => GetSortingOrder();
         public int RenderQueue => GetRenderQueue();
+        public int HierarchyDepth => GetTransformDepth();
 
         private GpuParticleBinding CurrentBinding
         {
@@ -54,6 +55,19 @@ namespace GpuParticle.Runtime
             return current != null && current.NativeRendererStates.Length > 0
                 ? current.NativeRendererStates[0].RenderQueue
                 : 3000;
+        }
+
+        private int GetTransformDepth()
+        {
+            int depth = 0;
+            Transform current = transform;
+            while (current != null)
+            {
+                depth++;
+                current = current.parent;
+            }
+
+            return depth;
         }
 
         public GpuParticleHandle Play()

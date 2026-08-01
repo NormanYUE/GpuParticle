@@ -113,6 +113,14 @@ namespace GpuParticle.Runtime
                 return compare;
             }
 
+            // When all explicit sorting keys are identical, render deeper children first
+            // and shallower parents later so that parents naturally occlude children.
+            compare = right.HierarchyDepth.CompareTo(left.HierarchyDepth);
+            if (compare != 0)
+            {
+                return compare;
+            }
+
             return string.Compare(left.name, right.name, System.StringComparison.Ordinal);
         }
 
