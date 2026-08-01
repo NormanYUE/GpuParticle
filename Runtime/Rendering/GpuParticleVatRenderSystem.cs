@@ -145,13 +145,18 @@ namespace GpuParticle.Runtime
         {
             pool.UpdateAll(Time.deltaTime);
             ReadOnlySpan<GpuParticleInstanceSlot> slots = pool.AliveSlots;
+
+            // Reuse batch objects across frames; only clear per-frame instance data.
+            foreach (BatchData batch in batches.Values)
+            {
+                batch.ClearInstances();
+            }
+
             if (slots.Length == 0)
             {
                 return;
             }
 
-            batches.Clear();
-            batchOrder.Clear();
             for (int i = 0; i < slots.Length; i++)
             {
                 GpuParticleInstanceSlot slot = slots[i];
@@ -163,7 +168,7 @@ namespace GpuParticle.Runtime
                 int key = slot.Clip.GetInstanceID();
                 if (!batches.TryGetValue(key, out BatchData batch))
                 {
-                    batch = new BatchData(slot.Clip, batchOrder.Count);
+                    batch = new BatchData(slot.Clip, batches.Count);
                     batches.Add(key, batch);
                     batchOrder.Add(batch);
                 }
@@ -212,6 +217,11 @@ namespace GpuParticle.Runtime
                     slot.ElapsedTime,
                     slot.TimeScale,
                     slot.SeedVariant));
+            }
+
+            public void ClearInstances()
+            {
+                instanceData.Clear();
             }
 
             public void Draw()
