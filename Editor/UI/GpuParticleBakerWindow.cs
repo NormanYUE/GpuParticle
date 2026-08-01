@@ -173,7 +173,7 @@ namespace GpuParticle.Editor
             {
                 if (prefabs[i] != null)
                 {
-                    results.Add(GpuParticleBakePipeline.BakePrefab(prefabs[i], settings));
+                    results.Add(GpuParticleBakePipeline.BakePrefabGroup(prefabs[i], settings));
                 }
             }
         }

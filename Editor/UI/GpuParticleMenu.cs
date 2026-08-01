@@ -28,7 +28,7 @@ namespace GpuParticle.Editor
             GpuParticleBakerSettings settings = GpuParticleProjectSettings.LoadOrCreate();
             for (int i = 0; i < prefabs.Count; i++)
             {
-                GpuParticleValidationResult result = GpuParticleBakePipeline.BakePrefab(prefabs[i], settings);
+                GpuParticleValidationResult result = GpuParticleBakePipeline.BakePrefabGroup(prefabs[i], settings);
                 LogResult("Bake", result);
             }
         }
