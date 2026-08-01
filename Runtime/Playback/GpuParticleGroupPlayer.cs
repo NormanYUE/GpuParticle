@@ -76,6 +76,19 @@ namespace GpuParticle.Runtime
             players.Clear();
             GetComponentsInChildren<GpuParticlePlayer>(true, players);
             players.Sort(ComparePlayerOrder);
+            for (int i = 0; i < players.Count; i++)
+            {
+                GpuParticlePlayer player = players[i];
+                if (player == null)
+                {
+                    continue;
+                }
+
+                Debug.Log(
+                    $"[GpuParticle] Group player order {i}: '{player.name}', " +
+                    $"layerValue={player.SortingLayerValue}, order={player.SortingOrder}, " +
+                    $"queue={player.RenderQueue}, depth={player.HierarchyDepth}");
+            }
         }
 
         private static int ComparePlayerOrder(GpuParticlePlayer left, GpuParticlePlayer right)
