@@ -259,6 +259,11 @@ namespace GpuParticle.Editor
                 return WriteNativeBinding(prefab, prefabPath, report.Failure);
             }
 
+            for (int i = 0; i < entries.Count; i++)
+            {
+                Debug.Log($"[GpuParticle] Baking runtime prefab entry {i}: path='{entries[i].TransformPath}', clip={entries[i].Clip?.name ?? "null"}");
+            }
+
             GameObject? runtimePrefab = GpuParticleRuntimePrefabBuilder.Build(prefab, settings, entries);
             if (runtimePrefab == null)
             {

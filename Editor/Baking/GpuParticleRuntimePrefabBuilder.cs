@@ -45,30 +45,35 @@ namespace GpuParticle.Editor.Baking
 
             DeleteAssetIfExists(runtimePrefabPath);
 
-            // Use GameObject.Instantiate instead of PrefabUtility.InstantiatePrefab so the copy is a
-            // plain hierarchy, not a prefab instance connected to the source. This avoids nested-prefab
-            // override issues when we strip components and add GPU playback components.
-            GameObject sourceInstance = Object.Instantiate(sourcePrefab);
-            if (sourceInstance == null)
+            // Load the source prefab contents into an isolated editing context (same technique
+            // the old binding writer used). Modify directly inside this context, then save the
+            // modified contents to a new prefab path. This avoids scene-instantiation quirks and
+            // nested-prefab override issues.
+            GameObject root = PrefabUtility.LoadPrefabContents(sourcePath);
+            if (root == null)
             {
-                Debug.LogError("[GpuParticle] Failed to instantiate source prefab for runtime prefab creation.");
+                Debug.LogError($"[GpuParticle] Failed to load prefab contents from {sourcePath}.");
                 return null;
             }
 
-            sourceInstance.name = sourcePrefab.name;
-
             try
             {
-                StripParticleSystems(sourceInstance);
+                StripParticleSystems(root);
 
+                int boundCount = 0;
                 for (int i = 0; i < bakedSystems.Count; i++)
                 {
-                    WriteSystemBinding(sourceInstance, bakedSystems[i]);
+                    if (WriteSystemBinding(root, bakedSystems[i]))
+                    {
+                        boundCount++;
+                    }
                 }
 
-                EnsureGroupPlayer(sourceInstance);
+                Debug.Log($"[GpuParticle] Runtime prefab built with {boundCount}/{bakedSystems.Count} system bindings.");
 
-                GameObject runtimePrefab = PrefabUtility.SaveAsPrefabAsset(sourceInstance, runtimePrefabPath);
+                EnsureGroupPlayer(root);
+
+                GameObject runtimePrefab = PrefabUtility.SaveAsPrefabAsset(root, runtimePrefabPath);
                 if (runtimePrefab == null)
                 {
                     Debug.LogError($"[GpuParticle] Failed to save runtime prefab at {runtimePrefabPath}.");
@@ -80,7 +85,7 @@ namespace GpuParticle.Editor.Baking
             }
             finally
             {
-                Object.DestroyImmediate(sourceInstance);
+                PrefabUtility.UnloadPrefabContents(root);
             }
         }
 
@@ -104,7 +109,7 @@ namespace GpuParticle.Editor.Baking
             }
         }
 
-        private static void WriteSystemBinding(GameObject root, BakedSystemEntry entry)
+        private static bool WriteSystemBinding(GameObject root, BakedSystemEntry entry)
         {
             Transform targetTransform = FindTransform(root.transform, entry.TransformPath);
             if (targetTransform == null)
@@ -112,7 +117,7 @@ namespace GpuParticle.Editor.Baking
                 Debug.LogWarning(
                     $"[GpuParticle] Could not find transform '{entry.TransformPath}' in runtime prefab; " +
                     $"available children: {string.Join(", ", GetChildNames(root.transform))}. Skipping binding.");
-                return;
+                return false;
             }
 
             GameObject target = targetTransform.gameObject;
@@ -124,6 +129,7 @@ namespace GpuParticle.Editor.Baking
                 entry.SystemStates,
                 entry.RendererStates,
                 addPlayer: true);
+            return true;
         }
 
         private static Transform FindTransform(Transform root, string path)
