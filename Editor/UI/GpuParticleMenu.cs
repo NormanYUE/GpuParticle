@@ -49,20 +49,20 @@ namespace GpuParticle.Editor
             }
         }
 
-        [MenuItem("Assets/GPU Particle/Revert To Native", true)]
+        [MenuItem("Assets/GPU Particle/Clear Baked Runtime Prefab", true)]
         public static bool ValidateRevertSelected()
         {
             return GetSelectedPrefabs().Count > 0;
         }
 
-        [MenuItem("Assets/GPU Particle/Revert To Native")]
+        [MenuItem("Assets/GPU Particle/Clear Baked Runtime Prefab")]
         public static void RevertSelected()
         {
             List<GameObject> prefabs = GetSelectedPrefabs();
             for (int i = 0; i < prefabs.Count; i++)
             {
                 GpuParticleBakePipeline.RevertToNative(prefabs[i]);
-                Debug.Log($"GPU Particle Revert: {AssetDatabase.GetAssetPath(prefabs[i])} -> {GpuParticleBakeStatus.Native}");
+                Debug.Log($"GPU Particle Clear Baked Runtime Prefab: {AssetDatabase.GetAssetPath(prefabs[i])}");
             }
         }
 

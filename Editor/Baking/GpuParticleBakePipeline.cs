@@ -319,8 +319,13 @@ namespace GpuParticle.Editor
                 return;
             }
 
-            GpuParticleClip? clip = prefab.GetComponent<GpuParticleBinding>()?.Clip;
-            GpuParticleBindingWriter.WriteBinding(prefab, GpuParticleBakeStatus.Native, clip, "RevertedToNative");
+            GpuParticleBakerSettings settings = GpuParticleProjectSettings.LoadOrCreate();
+            string folder = $"{settings.OutputRoot.TrimEnd('/')}/{prefab.name}";
+            string runtimePrefabPath = $"{folder}/{prefab.name}_Runtime.prefab";
+            if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(runtimePrefabPath) != null)
+            {
+                AssetDatabase.DeleteAsset(runtimePrefabPath);
+            }
         }
 
         private static void DeleteGeneratedFolder(GameObject prefab, GpuParticleBakerSettings settings)
