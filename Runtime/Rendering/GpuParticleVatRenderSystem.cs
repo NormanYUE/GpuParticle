@@ -163,7 +163,7 @@ namespace GpuParticle.Runtime
                 int key = slot.Clip.GetInstanceID();
                 if (!batches.TryGetValue(key, out BatchData batch))
                 {
-                    batch = new BatchData(slot.Clip);
+                    batch = new BatchData(slot.Clip, batchOrder.Count);
                     batches.Add(key, batch);
                     batchOrder.Add(batch);
                 }
@@ -192,15 +192,17 @@ namespace GpuParticle.Runtime
         private sealed class BatchData
         {
             private readonly GpuParticleClip clip;
+            private readonly int renderQueueOffset;
             private readonly List<GpuParticleInstanceData> instanceData = new List<GpuParticleInstanceData>();
             private readonly MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
             private GraphicsBuffer? instanceBuffer;
             private Material? material;
             private int lastInstanceCount;
 
-            public BatchData(GpuParticleClip clip)
+            public BatchData(GpuParticleClip clip, int queueOffset)
             {
                 this.clip = clip ?? throw new ArgumentNullException(nameof(clip));
+                renderQueueOffset = queueOffset;
             }
 
             public void Add(in GpuParticleInstanceSlot slot)
@@ -271,6 +273,7 @@ namespace GpuParticle.Runtime
                     {
                         material = new Material(renderer.sharedMaterial);
                         material.enableInstancing = true;
+                        material.renderQueue = renderer.sharedMaterial.renderQueue + renderQueueOffset;
 
                         if (clip.PositionSizeTexture != null)
                         {
