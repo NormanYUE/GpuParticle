@@ -42,13 +42,15 @@ Assets/GpuParticleGenerated/MyEffect/
    - `GpuParticleBinding` on the GameObject at the same transform path as the original particle system.
    - `GpuParticlePlayer` on the same GameObject.
 4. **Add at root**:
-   - `GpuParticleGroupPlayer` if more than one system was baked.
+   - `GpuParticleGroupPlayer` (always, so single and multi-system bakes behave consistently).
 
-The runtime prefab is a standalone asset and is **not** a prefab variant of the original.
+The runtime prefab is a standalone asset and is **not** a prefab variant of the original. Nested prefab connections from the original will be flattened, which is acceptable for a runtime visualization prefab.
 
 ### Pipeline Changes
 
 #### `GpuParticleBakePipeline`
+Both `BakePrefab` (single system) and `BakePrefabGroup` (multi system) will follow the same non-destructive flow:
+
 - After VAT assets are written, instead of calling `GpuParticleBindingWriter.WriteBinding(prefab, ...)` on the original prefab, call a new helper:
   ```csharp
   GameObject runtimePrefab = GpuParticleRuntimePrefabBuilder.Build(
@@ -102,7 +104,15 @@ The native particle system/renderer states are still captured from the preview s
 - **Existing runtime prefab**: overwrite it.
 - **Missing transform path in duplicated instance**: log warning and skip that system.
 - **Original prefab scripts referencing ParticleSystem**: references will be missing in the runtime prefab. This is expected; the runtime prefab is for visualization playback only. The original prefab remains editable.
-- **Single system bake**: still create a `_Runtime.prefab`; only add `GpuParticleGroupPlayer` when there are multiple baked systems (or always add it for consistency).
+- **Single system bake**: still create a `_Runtime.prefab`; `GpuParticleGroupPlayer` is always added at root for consistency.
+
+### `RevertToNative` Behavior
+Because the original prefab is no longer modified, `RevertToNative(prefab)` changes meaning:
+
+- It no longer writes a `Native` binding back into the original prefab.
+- It deletes the generated `_Runtime.prefab` for that source prefab if one exists.
+- It leaves the original prefab and the VAT texture/mesh/clip assets untouched.
+- The menu item label may be updated to "Clear Baked Runtime Prefab" to reflect the new behavior.
 
 ### Backward Compatibility
 This is a behavior change. Old baked prefabs that already have GPU components written into them will continue to work. New bakes will not modify the source prefab anymore. No migration is required.
