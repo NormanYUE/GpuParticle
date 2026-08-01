@@ -341,6 +341,41 @@ namespace GpuParticle.Editor
             return new GpuParticleValidationResult(prefabPath, GpuParticleBakeStatus.Native, failure, null!);
         }
 
+        private static (GpuParticleNativeSystemState[] systems, GpuParticleNativeRendererState[] renderers)
+            CaptureNativeStatesAtPath(GameObject root, string transformPath)
+        {
+            GameObject target = root;
+            if (!string.IsNullOrEmpty(transformPath))
+            {
+                Transform child = root.transform.Find(transformPath);
+                if (child != null)
+                {
+                    target = child.gameObject;
+                }
+            }
+
+            ParticleSystem[] systems = target.GetComponents<ParticleSystem>();
+            ParticleSystemRenderer[] renderers = target.GetComponents<ParticleSystemRenderer>();
+
+            GpuParticleNativeSystemState[] systemStates = new GpuParticleNativeSystemState[systems.Length];
+            for (int i = 0; i < systems.Length; i++)
+            {
+                GpuParticleNativeSystemState state = new GpuParticleNativeSystemState();
+                state.Capture(systems[i]);
+                systemStates[i] = state;
+            }
+
+            GpuParticleNativeRendererState[] rendererStates = new GpuParticleNativeRendererState[renderers.Length];
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                GpuParticleNativeRendererState state = new GpuParticleNativeRendererState();
+                state.Capture(renderers[i]);
+                rendererStates[i] = state;
+            }
+
+            return (systemStates, rendererStates);
+        }
+
         private static bool AnalyzeSupported(ParticleSystem[] systems, GpuParticleBakeReport report)
         {
             for (int i = 0; i < systems.Length; i++)
