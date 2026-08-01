@@ -77,6 +77,7 @@ namespace GpuParticle.Editor
                 renderers,
                 settings.SampleRate,
                 duration,
+                loop,
                 report);
 
             if (report.HasFailure || !capture.HasValue)
@@ -199,6 +200,7 @@ namespace GpuParticle.Editor
                 renderers,
                 settings.SampleRate,
                 duration,
+                loop,
                 report);
 
             if (captures.Count == 0)
@@ -558,10 +560,11 @@ namespace GpuParticle.Editor
             ParticleSystemRenderer[] renderers,
             float sampleRate,
             float duration,
+            bool loop,
             GpuParticleBakeReport report)
         {
             Dictionary<ParticleSystemRenderer, VatCaptureData> allData = CaptureAllRenderers(
-                root, systems, renderers, sampleRate, duration, report);
+                root, systems, renderers, sampleRate, duration, loop, report);
 
             if (allData.Count == 0)
             {
@@ -588,6 +591,7 @@ namespace GpuParticle.Editor
             ParticleSystemRenderer[] renderers,
             float sampleRate,
             float duration,
+            bool loop,
             GpuParticleBakeReport report)
         {
             var result = new Dictionary<ParticleSystemRenderer, VatCaptureData>();
@@ -617,12 +621,12 @@ namespace GpuParticle.Editor
                 return result;
             }
 
-            int frameCount = Mathf.CeilToInt(duration * sampleRate) + 1;
+            int baseFrameCount = Mathf.CeilToInt(duration * sampleRate) + 1;
             float dt = 1f / sampleRate;
             ParticleSystem[] rootSystems = GetRootSystems(root.transform, systems);
 
             ResetAndPlay(rootSystems);
-            for (int frame = 0; frame < frameCount; frame++)
+            for (int frame = 0; frame < baseFrameCount; frame++)
             {
                 for (int rendererIndex = 0; rendererIndex < validRenderers.Count; rendererIndex++)
                 {
@@ -636,6 +640,19 @@ namespace GpuParticle.Editor
                 for (int systemIndex = 0; systemIndex < rootSystems.Length; systemIndex++)
                 {
                     rootSystems[systemIndex].Simulate(dt, true, false, false);
+                }
+            }
+
+            if (loop)
+            {
+                for (int i = 0; i < validRenderers.Count; i++)
+                {
+                    ParticleSystemRenderer renderer = validRenderers[i];
+                    List<GpuParticleBlobParticleState[]> frames = framesPerRenderer[renderer];
+                    if (frames.Count > 0)
+                    {
+                        frames.Add(CopyFrameStates(frames[0]));
+                    }
                 }
             }
 
@@ -678,6 +695,17 @@ namespace GpuParticle.Editor
             }
 
             return result;
+        }
+
+        private static GpuParticleBlobParticleState[] CopyFrameStates(GpuParticleBlobParticleState[] source)
+        {
+            GpuParticleBlobParticleState[] copy = new GpuParticleBlobParticleState[source.Length];
+            for (int i = 0; i < source.Length; i++)
+            {
+                copy[i] = source[i];
+            }
+
+            return copy;
         }
 
         private static GpuParticleBlobParticleState[] CaptureParticleStates(ParticleSystem system, int maxParticles)
