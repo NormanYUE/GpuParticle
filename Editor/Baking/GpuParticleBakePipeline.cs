@@ -625,6 +625,17 @@ namespace GpuParticle.Editor
             float dt = 1f / sampleRate;
             ParticleSystem[] rootSystems = GetRootSystems(root.transform, systems);
 
+            var seedColumnsPerRenderer = new Dictionary<ParticleSystemRenderer, Dictionary<uint, int>>();
+            var columnBuffersPerRenderer = new Dictionary<ParticleSystemRenderer, GpuParticleBlobParticleState[]>();
+            for (int rendererIndex = 0; rendererIndex < validRenderers.Count; rendererIndex++)
+            {
+                ParticleSystemRenderer renderer = validRenderers[rendererIndex];
+                ParticleSystem system = renderer.GetComponent<ParticleSystem>();
+                int maxParticles = system.main.maxParticles;
+                seedColumnsPerRenderer[renderer] = new Dictionary<uint, int>();
+                columnBuffersPerRenderer[renderer] = new GpuParticleBlobParticleState[maxParticles];
+            }
+
             ResetAndPlay(rootSystems);
             for (int frame = 0; frame < baseFrameCount; frame++)
             {
@@ -633,8 +644,38 @@ namespace GpuParticle.Editor
                     ParticleSystemRenderer renderer = validRenderers[rendererIndex];
                     ParticleSystem system = renderer.GetComponent<ParticleSystem>();
                     int maxParticles = system.main.maxParticles;
-                    GpuParticleBlobParticleState[] states = CaptureParticleStates(system, maxParticles);
-                    framesPerRenderer[renderer].Add(states);
+                    GpuParticleBlobParticleState[] currentStates = CaptureParticleStates(system, maxParticles);
+
+                    Dictionary<uint, int> seedColumns = seedColumnsPerRenderer[renderer];
+                    GpuParticleBlobParticleState[] columnBuffer = columnBuffersPerRenderer[renderer];
+
+                    // Keep dead particles at their last known position but with zero size
+                    // to avoid teleporting to (0,0,0) when they respawn.
+                    for (int i = 0; i < maxParticles; i++)
+                    {
+                        GpuParticleBlobParticleState s = columnBuffer[i];
+                        s.Size = 0f;
+                        columnBuffer[i] = s;
+                    }
+
+                    for (int i = 0; i < currentStates.Length && i < maxParticles; i++)
+                    {
+                        GpuParticleBlobParticleState state = currentStates[i];
+                        if (!seedColumns.TryGetValue(state.Seed, out int column))
+                        {
+                            column = seedColumns.Count;
+                            if (column >= maxParticles)
+                            {
+                                column = (int)(state.Seed % (uint)maxParticles);
+                            }
+
+                            seedColumns[state.Seed] = column;
+                        }
+
+                        columnBuffer[column] = state;
+                    }
+
+                    framesPerRenderer[renderer].Add((GpuParticleBlobParticleState[])columnBuffer.Clone());
                 }
 
                 for (int systemIndex = 0; systemIndex < rootSystems.Length; systemIndex++)
