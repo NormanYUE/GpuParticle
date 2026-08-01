@@ -28,14 +28,9 @@ Shader "GpuParticle/VatBillboard"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
-            #pragma instancing_options procedural:SetupProcVertex
             #pragma multi_compile_local _ ALIGNMENT_VIEW ALIGNMENT_FACING ALIGNMENT_WORLD ALIGNMENT_LOCAL
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-
-            void SetupProcVertex()
-            {
-            }
 
             TEXTURE2D(_PositionSizeTex);
             SAMPLER(sampler_PositionSizeTex);
