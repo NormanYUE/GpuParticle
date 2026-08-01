@@ -6,7 +6,8 @@ Shader "GpuParticle/VatStretch"
         _PositionSizeTex("Position + Size", 2D) = "white" {}
         _ColorTex("Color", 2D) = "white" {}
         _VelocityLifetimeTex("Velocity + Lifetime", 2D) = "white" {}
-        _StretchScale("Stretch Scale", Float) = 0.1
+        _LengthScale("Length Scale", Float) = 0
+        _VelocityScale("Velocity Scale", Float) = 0
     }
 
     SubShader
@@ -47,7 +48,8 @@ Shader "GpuParticle/VatStretch"
                 float _Duration;
                 float _FrameCount;
                 float4 _TexelSize;
-                float _StretchScale;
+                float _LengthScale;
+                float _VelocityScale;
             CBUFFER_END
 
             struct InstanceData
@@ -111,8 +113,9 @@ Shader "GpuParticle/VatStretch"
                 float size = posSize.w;
 
                 float3 worldVel = mul(inst.localToWorld, float4(velLife.xyz, 0)).xyz;
+                float speed = length(worldVel);
                 float3 stretchDir = normalize(worldVel + 0.0001);
-                float stretchLen = length(worldVel) * _StretchScale;
+                float stretchLen = size * _LengthScale + speed * _VelocityScale;
 
                 float3 viewRight = normalize(UNITY_MATRIX_I_V._11_21_31);
 

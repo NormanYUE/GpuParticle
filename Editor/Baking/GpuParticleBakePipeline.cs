@@ -535,6 +535,8 @@ namespace GpuParticle.Editor
             public readonly Material SourceMaterial;
             public readonly Mesh SourceMesh;
             public readonly int MaxParticles;
+            public readonly float LengthScale;
+            public readonly float VelocityScale;
             public readonly IReadOnlyList<GpuParticleBlobParticleState[]> Frames;
 
             public VatCaptureData(
@@ -543,6 +545,8 @@ namespace GpuParticle.Editor
                 Material sourceMaterial,
                 Mesh sourceMesh,
                 int maxParticles,
+                float lengthScale,
+                float velocityScale,
                 IReadOnlyList<GpuParticleBlobParticleState[]> frames)
             {
                 RenderMode = renderMode;
@@ -550,6 +554,8 @@ namespace GpuParticle.Editor
                 SourceMaterial = sourceMaterial;
                 SourceMesh = sourceMesh;
                 MaxParticles = maxParticles;
+                LengthScale = lengthScale;
+                VelocityScale = velocityScale;
                 Frames = frames;
             }
         }
@@ -754,6 +760,8 @@ namespace GpuParticle.Editor
                     sourceMaterial,
                     sourceMesh,
                     system.main.maxParticles,
+                    renderer.lengthScale,
+                    renderer.velocityScale,
                     frames);
             }
 
@@ -889,7 +897,8 @@ namespace GpuParticle.Editor
 
             if (data.RenderMode == GpuParticleRenderMode.StretchedBillboard)
             {
-                material.SetFloat("_StretchScale", 0.1f);
+                material.SetFloat("_LengthScale", data.LengthScale);
+                material.SetFloat("_VelocityScale", data.VelocityScale);
             }
 
             if (data.RenderMode == GpuParticleRenderMode.Billboard || data.RenderMode == GpuParticleRenderMode.StretchedBillboard)
