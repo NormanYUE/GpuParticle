@@ -627,6 +627,8 @@ namespace GpuParticle.Editor
 
             var seedColumnsPerRenderer = new Dictionary<ParticleSystemRenderer, Dictionary<uint, int>>();
             var columnBuffersPerRenderer = new Dictionary<ParticleSystemRenderer, GpuParticleBlobParticleState[]>();
+            var columnSeedsPerRenderer = new Dictionary<ParticleSystemRenderer, int[]>();
+            var columnAlivePerRenderer = new Dictionary<ParticleSystemRenderer, bool[]>();
             for (int rendererIndex = 0; rendererIndex < validRenderers.Count; rendererIndex++)
             {
                 ParticleSystemRenderer renderer = validRenderers[rendererIndex];
@@ -634,6 +636,15 @@ namespace GpuParticle.Editor
                 int maxParticles = system.main.maxParticles;
                 seedColumnsPerRenderer[renderer] = new Dictionary<uint, int>();
                 columnBuffersPerRenderer[renderer] = new GpuParticleBlobParticleState[maxParticles];
+                int[] columnSeeds = new int[maxParticles];
+                bool[] columnAlive = new bool[maxParticles];
+                for (int i = 0; i < maxParticles; i++)
+                {
+                    columnSeeds[i] = -1;
+                }
+
+                columnSeedsPerRenderer[renderer] = columnSeeds;
+                columnAlivePerRenderer[renderer] = columnAlive;
             }
 
             ResetAndPlay(rootSystems);
@@ -648,9 +659,12 @@ namespace GpuParticle.Editor
 
                     Dictionary<uint, int> seedColumns = seedColumnsPerRenderer[renderer];
                     GpuParticleBlobParticleState[] columnBuffer = columnBuffersPerRenderer[renderer];
+                    int[] columnSeeds = columnSeedsPerRenderer[renderer];
+                    bool[] columnAlive = columnAlivePerRenderer[renderer];
 
-                    // Keep dead particles at their last known position but with zero size
-                    // to avoid teleporting to (0,0,0) when they respawn.
+                    // Mark every column as dead for this frame. Dead columns keep their
+                    // last known position but zero size so they do not teleport to origin.
+                    Array.Fill(columnAlive, false);
                     for (int i = 0; i < maxParticles; i++)
                     {
                         GpuParticleBlobParticleState s = columnBuffer[i];
@@ -663,16 +677,24 @@ namespace GpuParticle.Editor
                         GpuParticleBlobParticleState state = currentStates[i];
                         if (!seedColumns.TryGetValue(state.Seed, out int column))
                         {
-                            column = seedColumns.Count;
-                            if (column >= maxParticles)
+                            column = FindFreeParticleColumn(columnSeeds, columnAlive, maxParticles);
+                            if (column < 0)
                             {
+                                // All columns are occupied by live particles. Fall back to
+                                // a deterministic slot, accepting that two particles may share it.
                                 column = (int)(state.Seed % (uint)maxParticles);
+                                if (columnSeeds[column] >= 0)
+                                {
+                                    seedColumns.Remove((uint)columnSeeds[column]);
+                                }
                             }
 
                             seedColumns[state.Seed] = column;
+                            columnSeeds[column] = (int)state.Seed;
                         }
 
                         columnBuffer[column] = state;
+                        columnAlive[column] = true;
                     }
 
                     framesPerRenderer[renderer].Add((GpuParticleBlobParticleState[])columnBuffer.Clone());
@@ -736,6 +758,27 @@ namespace GpuParticle.Editor
             }
 
             return result;
+        }
+
+        private static int FindFreeParticleColumn(int[] columnSeeds, bool[] columnAlive, int maxParticles)
+        {
+            for (int i = 0; i < maxParticles; i++)
+            {
+                if (columnSeeds[i] < 0)
+                {
+                    return i;
+                }
+            }
+
+            for (int i = 0; i < maxParticles; i++)
+            {
+                if (!columnAlive[i])
+                {
+                    return i;
+                }
+            }
+
+            return -1;
         }
 
         private static GpuParticleBlobParticleState[] CopyFrameStates(GpuParticleBlobParticleState[] source)
