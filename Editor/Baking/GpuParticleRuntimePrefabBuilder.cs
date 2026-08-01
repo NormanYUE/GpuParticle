@@ -129,6 +129,7 @@ namespace GpuParticle.Editor.Baking
                 entry.SystemStates,
                 entry.RendererStates,
                 addPlayer: true);
+            Debug.Log($"[GpuParticle] Wrote binding to '{target.name}' at path '{entry.TransformPath}'.");
             return true;
         }
 
@@ -139,36 +140,7 @@ namespace GpuParticle.Editor.Baking
                 return root;
             }
 
-            string[] parts = path.Split('/');
-            Transform current = root;
-            foreach (string part in parts)
-            {
-                Transform child = FindChildByName(current, part);
-                if (child == null)
-                {
-                    return null;
-                }
-
-                current = child;
-            }
-
-            return current;
-        }
-
-        private static Transform FindChildByName(Transform parent, string name)
-        {
-            // Transform.Find only searches active children; this scans all children.
-            int childCount = parent.childCount;
-            for (int i = 0; i < childCount; i++)
-            {
-                Transform child = parent.GetChild(i);
-                if (child.name == name)
-                {
-                    return child;
-                }
-            }
-
-            return null;
+            return root.Find(path);
         }
 
         private static string[] GetChildNames(Transform parent)
