@@ -33,12 +33,23 @@ namespace GpuParticle.Runtime
         public GpuParticleHandle Play(in GpuParticlePlayParams parameters)
         {
             GpuParticleBinding current = CurrentBinding;
-            if (current == null || current.Clip == null || current.Clip.Prefab == null)
+            if (current == null)
             {
-                if (current != null)
-                {
-                    GpuParticleNativeFallback.Play(current, parameters.TimeScale, parameters.SeedVariant);
-                }
+                Debug.LogWarning($"[GpuParticle] GpuParticlePlayer on '{gameObject.name}' has no GpuParticleBinding.");
+                return GpuParticleHandle.Invalid;
+            }
+
+            if (current.Clip == null)
+            {
+                Debug.LogWarning($"[GpuParticle] GpuParticlePlayer on '{gameObject.name}' has no clip assigned.");
+                GpuParticleNativeFallback.Play(current, parameters.TimeScale, parameters.SeedVariant);
+                return GpuParticleHandle.Invalid;
+            }
+
+            if (current.Clip.Prefab == null)
+            {
+                Debug.LogWarning($"[GpuParticle] GpuParticlePlayer on '{gameObject.name}' clip '{current.Clip.name}' has no VAT prefab.");
+                GpuParticleNativeFallback.Play(current, parameters.TimeScale, parameters.SeedVariant);
                 return GpuParticleHandle.Invalid;
             }
 
@@ -54,6 +65,7 @@ namespace GpuParticle.Runtime
 
             if (slot < 0)
             {
+                Debug.LogWarning($"[GpuParticle] GpuParticlePlayer on '{gameObject.name}' failed to register VAT instance (pool full?).");
                 GpuParticleNativeFallback.Play(current, parameters.TimeScale, parameters.SeedVariant);
                 return GpuParticleHandle.Invalid;
             }
