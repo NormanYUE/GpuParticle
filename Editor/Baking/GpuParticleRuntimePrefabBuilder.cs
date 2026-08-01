@@ -45,12 +45,17 @@ namespace GpuParticle.Editor.Baking
 
             DeleteAssetIfExists(runtimePrefabPath);
 
-            GameObject sourceInstance = (GameObject)PrefabUtility.InstantiatePrefab(sourcePrefab);
+            // Use GameObject.Instantiate instead of PrefabUtility.InstantiatePrefab so the copy is a
+            // plain hierarchy, not a prefab instance connected to the source. This avoids nested-prefab
+            // override issues when we strip components and add GPU playback components.
+            GameObject sourceInstance = Object.Instantiate(sourcePrefab);
             if (sourceInstance == null)
             {
                 Debug.LogError("[GpuParticle] Failed to instantiate source prefab for runtime prefab creation.");
                 return null;
             }
+
+            sourceInstance.name = sourcePrefab.name;
 
             try
             {
@@ -101,10 +106,12 @@ namespace GpuParticle.Editor.Baking
 
         private static void WriteSystemBinding(GameObject root, BakedSystemEntry entry)
         {
-            Transform targetTransform = root.transform.Find(entry.TransformPath);
+            Transform targetTransform = FindTransform(root.transform, entry.TransformPath);
             if (targetTransform == null)
             {
-                Debug.LogWarning($"[GpuParticle] Could not find transform '{entry.TransformPath}' in runtime prefab; skipping binding.");
+                Debug.LogWarning(
+                    $"[GpuParticle] Could not find transform '{entry.TransformPath}' in runtime prefab; " +
+                    $"available children: {string.Join(", ", GetChildNames(root.transform))}. Skipping binding.");
                 return;
             }
 
@@ -119,6 +126,57 @@ namespace GpuParticle.Editor.Baking
                 addPlayer: true);
         }
 
+        private static Transform FindTransform(Transform root, string path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                return root;
+            }
+
+            string[] parts = path.Split('/');
+            Transform current = root;
+            foreach (string part in parts)
+            {
+                Transform child = FindChildByName(current, part);
+                if (child == null)
+                {
+                    return null;
+                }
+
+                current = child;
+            }
+
+            return current;
+        }
+
+        private static Transform FindChildByName(Transform parent, string name)
+        {
+            // Transform.Find only searches active children; this scans all children.
+            int childCount = parent.childCount;
+            for (int i = 0; i < childCount; i++)
+            {
+                Transform child = parent.GetChild(i);
+                if (child.name == name)
+                {
+                    return child;
+                }
+            }
+
+            return null;
+        }
+
+        private static string[] GetChildNames(Transform parent)
+        {
+            int childCount = parent.childCount;
+            string[] names = new string[childCount];
+            for (int i = 0; i < childCount; i++)
+            {
+                names[i] = parent.GetChild(i).name;
+            }
+
+            return names;
+        }
+
         private static void EnsureGroupPlayer(GameObject root)
         {
             if (root.GetComponent<GpuParticleGroupPlayer>() == null)
@@ -129,7 +187,7 @@ namespace GpuParticle.Editor.Baking
 
         private static void DeleteAssetIfExists(string assetPath)
         {
-            if (AssetDatabase.LoadAssetAtPath<Object>(assetPath) != null)
+            if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath) != null)
             {
                 AssetDatabase.DeleteAsset(assetPath);
             }
