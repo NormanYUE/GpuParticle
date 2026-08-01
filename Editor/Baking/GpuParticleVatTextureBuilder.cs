@@ -61,6 +61,11 @@ namespace GpuParticle.Editor.Baking
             rotTex.SetPixels(rotColors);
             velTex.SetPixels(velColors);
 
+            SetTextureImportSettings(posSizeTex);
+            SetTextureImportSettings(colorTex);
+            SetTextureImportSettings(rotTex);
+            SetTextureImportSettings(velTex);
+
             posSizeTex.Apply(false, false);
             colorTex.Apply(false, false);
             rotTex.Apply(false, false);
@@ -73,6 +78,12 @@ namespace GpuParticle.Editor.Baking
                 Rotation = rotTex,
                 VelocityLifetime = velTex,
             };
+        }
+
+        private static void SetTextureImportSettings(Texture2D texture)
+        {
+            texture.filterMode = FilterMode.Point;
+            texture.wrapMode = TextureWrapMode.Clamp;
         }
     }
 }
