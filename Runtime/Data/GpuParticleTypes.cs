@@ -341,16 +341,28 @@ namespace GpuParticle.Runtime
         [SerializeField] private ParticleSystemRenderer renderer = null!;
         [SerializeField] private bool gameObjectActive;
         [SerializeField] private bool enabled;
+        [SerializeField] private int sortingLayerId;
+        [SerializeField] private int sortingOrder;
+        [SerializeField] private int renderQueue;
 
         public ParticleSystemRenderer Renderer => renderer;
         public bool GameObjectActive => gameObjectActive;
         public bool Enabled => enabled;
+        public int SortingLayerId => sortingLayerId;
+        public int SortingOrder => sortingOrder;
+        public int RenderQueue => renderQueue;
 
         public void Capture(ParticleSystemRenderer source)
         {
             renderer = source;
             gameObjectActive = source != null && source.gameObject.activeSelf;
             enabled = source != null && source.enabled;
+            if (source != null)
+            {
+                sortingLayerId = source.sortingLayerID;
+                sortingOrder = source.sortingOrder;
+                renderQueue = source.sharedMaterial != null ? source.sharedMaterial.renderQueue : 3000;
+            }
         }
     }
 

@@ -75,6 +75,45 @@ namespace GpuParticle.Runtime
         {
             players.Clear();
             GetComponentsInChildren<GpuParticlePlayer>(true, players);
+            players.Sort(ComparePlayerOrder);
+        }
+
+        private static int ComparePlayerOrder(GpuParticlePlayer left, GpuParticlePlayer right)
+        {
+            if (left == right)
+            {
+                return 0;
+            }
+
+            if (left == null)
+            {
+                return 1;
+            }
+
+            if (right == null)
+            {
+                return -1;
+            }
+
+            int compare = left.SortingLayerValue.CompareTo(right.SortingLayerValue);
+            if (compare != 0)
+            {
+                return compare;
+            }
+
+            compare = left.SortingOrder.CompareTo(right.SortingOrder);
+            if (compare != 0)
+            {
+                return compare;
+            }
+
+            compare = left.RenderQueue.CompareTo(right.RenderQueue);
+            if (compare != 0)
+            {
+                return compare;
+            }
+
+            return string.Compare(left.name, right.name, System.StringComparison.Ordinal);
         }
 
         private void OnDisable()

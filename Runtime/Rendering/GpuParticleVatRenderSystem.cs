@@ -24,6 +24,7 @@ namespace GpuParticle.Runtime
 
         private readonly GpuParticleInstancePool pool = new GpuParticleInstancePool();
         private readonly Dictionary<int, BatchData> batches = new Dictionary<int, BatchData>();
+        private readonly List<BatchData> batchOrder = new List<BatchData>();
         private bool subscribed;
 
         private GpuParticleVatRenderSystem()
@@ -150,6 +151,7 @@ namespace GpuParticle.Runtime
             }
 
             batches.Clear();
+            batchOrder.Clear();
             for (int i = 0; i < slots.Length; i++)
             {
                 GpuParticleInstanceSlot slot = slots[i];
@@ -163,14 +165,15 @@ namespace GpuParticle.Runtime
                 {
                     batch = new BatchData(slot.Clip);
                     batches.Add(key, batch);
+                    batchOrder.Add(batch);
                 }
 
                 batch.Add(slot);
             }
 
-            foreach (BatchData batch in batches.Values)
+            for (int i = 0; i < batchOrder.Count; i++)
             {
-                batch.Draw();
+                batchOrder[i].Draw();
             }
         }
 

@@ -12,6 +12,10 @@ namespace GpuParticle.Runtime
         public bool IsPlaying => handle.IsValid;
         public bool IsUsingGpu => handle.IsValid;
 
+        public int SortingLayerValue => GetSortingLayerValue();
+        public int SortingOrder => GetSortingOrder();
+        public int RenderQueue => GetRenderQueue();
+
         private GpuParticleBinding CurrentBinding
         {
             get
@@ -23,6 +27,33 @@ namespace GpuParticle.Runtime
 
                 return binding;
             }
+        }
+
+        private int GetSortingLayerValue()
+        {
+            GpuParticleBinding current = CurrentBinding;
+            if (current == null || current.NativeRendererStates.Length == 0)
+            {
+                return SortingLayer.GetLayerValueFromID(0);
+            }
+
+            return SortingLayer.GetLayerValueFromID(current.NativeRendererStates[0].SortingLayerId);
+        }
+
+        private int GetSortingOrder()
+        {
+            GpuParticleBinding current = CurrentBinding;
+            return current != null && current.NativeRendererStates.Length > 0
+                ? current.NativeRendererStates[0].SortingOrder
+                : 0;
+        }
+
+        private int GetRenderQueue()
+        {
+            GpuParticleBinding current = CurrentBinding;
+            return current != null && current.NativeRendererStates.Length > 0
+                ? current.NativeRendererStates[0].RenderQueue
+                : 3000;
         }
 
         public GpuParticleHandle Play()
