@@ -117,12 +117,23 @@ Shader "GpuParticle/VatStretch"
                 float3 stretchDir = normalize(worldVel + 0.0001);
                 float stretchLen = size * _LengthScale + speed * _VelocityScale;
 
-                float3 viewRight = normalize(UNITY_MATRIX_I_V._11_21_31);
+                // Face the camera along the width axis while stretching along velocity.
+                float3 viewDir = normalize(UNITY_MATRIX_I_V._31_32_33);
+                float3 right = cross(viewDir, stretchDir);
+                float rightLen = length(right);
+                if (rightLen < 0.0001)
+                {
+                    right = normalize(UNITY_MATRIX_I_V._11_21_31);
+                }
+                else
+                {
+                    right /= rightLen;
+                }
 
                 float2 quadUv = v.uv0;
                 float3 corner = center
                     + stretchDir * (quadUv.y - 0.5) * stretchLen
-                    + viewRight * (quadUv.x - 0.5) * size;
+                    + right * (quadUv.x - 0.5) * size;
 
                 v2f o;
                 o.positionCS = TransformWorldToHClip(corner);
