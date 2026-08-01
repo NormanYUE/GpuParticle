@@ -211,6 +211,7 @@ namespace GpuParticle.Editor
 
             DeleteGeneratedFolder(prefab, settings);
 
+            List<BakedSystemEntry> entries = new List<BakedSystemEntry>();
             int bakedCount = 0;
             foreach (KeyValuePair<ParticleSystemRenderer, VatCaptureData> entry in captures)
             {
@@ -240,14 +241,14 @@ namespace GpuParticle.Editor
 
                 if (clip != null)
                 {
-                    GpuParticleBindingWriter.WriteBinding(
-                        prefab,
+                    (GpuParticleNativeSystemState[] systemStates, GpuParticleNativeRendererState[] rendererStates) =
+                        CaptureNativeStatesAtPath(instance, systemName);
+
+                    entries.Add(new BakedSystemEntry(
                         systemName,
-                        GpuParticleBakeStatus.GpuReady,
                         clip,
-                        string.Empty,
-                        captureChildren: false,
-                        addPlayer: true);
+                        systemStates,
+                        rendererStates));
                     bakedCount++;
                 }
             }
@@ -258,9 +259,19 @@ namespace GpuParticle.Editor
                 return WriteNativeBinding(prefab, prefabPath, report.Failure);
             }
 
-            AddGroupPlayer(prefab);
-            AssetDatabase.ImportAsset(prefabPath, ImportAssetOptions.ForceSynchronousImport);
-            return new GpuParticleValidationResult(prefabPath, GpuParticleBakeStatus.GpuReady, GpuParticleFailure.None, null!);
+            GameObject? runtimePrefab = GpuParticleRuntimePrefabBuilder.Build(prefab, settings, entries);
+            if (runtimePrefab == null)
+            {
+                report.Fail(GpuParticleFailureCode.RuntimeGpuFailure, "Failed to build runtime prefab.", prefabPath);
+                return WriteNativeBinding(prefab, prefabPath, report.Failure);
+            }
+
+            return new GpuParticleValidationResult(
+                prefabPath,
+                GpuParticleBakeStatus.GpuReady,
+                GpuParticleFailure.None,
+                null,
+                runtimePrefab);
         }
 
         public static GpuParticleValidationResult ValidatePrefab(GameObject prefab)
