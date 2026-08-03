@@ -5,6 +5,8 @@ Shader "GpuParticle/VatBillboard"
         _MainTex("Texture", 2D) = "white" {}
         _PositionSizeTex("Position + Size", 2D) = "white" {}
         _ColorTex("Color", 2D) = "white" {}
+        _SheetFrameTex("Sheet Frame", 2D) = "white" {}
+        _SheetTiles("Sheet Tiles", Vector) = (0, 0, 0, 0)
     }
 
     SubShader
@@ -36,6 +38,8 @@ Shader "GpuParticle/VatBillboard"
             SAMPLER(sampler_PositionSizeTex);
             TEXTURE2D(_ColorTex);
             SAMPLER(sampler_ColorTex);
+            TEXTURE2D(_SheetFrameTex);
+            SAMPLER(sampler_SheetFrameTex);
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
 
@@ -43,6 +47,7 @@ Shader "GpuParticle/VatBillboard"
                 float _Duration;
                 float _FrameCount;
                 float4 _TexelSize;
+                float4 _SheetTiles;
             CBUFFER_END
 
             struct InstanceData
@@ -67,6 +72,7 @@ Shader "GpuParticle/VatBillboard"
                 float4 positionCS : SV_POSITION;
                 float4 color : COLOR;
                 float2 uv : TEXCOORD0;
+                float sheetFrame : TEXCOORD1;
             };
 
             float2 ParticleUv(uint particleIndex, uint frameIndex)
@@ -98,6 +104,10 @@ Shader "GpuParticle/VatBillboard"
                 float4 colorB = SAMPLE_TEXTURE2D_LOD(_ColorTex, sampler_ColorTex, uvB, 0);
                 float4 color = lerp(colorA, colorB, t);
 
+                float sheetFrameA = SAMPLE_TEXTURE2D_LOD(_SheetFrameTex, sampler_SheetFrameTex, uvA, 0).r;
+                float sheetFrameB = SAMPLE_TEXTURE2D_LOD(_SheetFrameTex, sampler_SheetFrameTex, uvB, 0).r;
+                float sheetFrame = lerp(sheetFrameA, sheetFrameB, t);
+
                 float3 center = mul(inst.localToWorld, float4(posSize.xyz, 1)).xyz;
                 float size = posSize.w;
 
@@ -114,12 +124,27 @@ Shader "GpuParticle/VatBillboard"
                 o.positionCS = TransformWorldToHClip(corner);
                 o.color = color;
                 o.uv = quadUv;
+                o.sheetFrame = sheetFrame;
                 return o;
+            }
+
+            float2 ApplyTextureSheet(float2 quadUv, float sheetFrame)
+            {
+                if (_SheetTiles.z <= 0.0)
+                {
+                    return quadUv;
+                }
+
+                float2 tileCount = _SheetTiles.xy;
+                float2 tileSize = 1.0 / tileCount;
+                float2 tileOffset = float2(fmod(sheetFrame, tileCount.x), floor(sheetFrame / tileCount.x)) * tileSize;
+                return quadUv * tileSize + tileOffset;
             }
 
             half4 frag(v2f i) : SV_Target
             {
-                half4 tex = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.uv);
+                float2 uv = ApplyTextureSheet(i.uv, i.sheetFrame);
+                half4 tex = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv);
                 return tex * i.color;
             }
             ENDHLSL

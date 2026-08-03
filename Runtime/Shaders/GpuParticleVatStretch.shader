@@ -6,6 +6,8 @@ Shader "GpuParticle/VatStretch"
         _PositionSizeTex("Position + Size", 2D) = "white" {}
         _ColorTex("Color", 2D) = "white" {}
         _VelocityLifetimeTex("Velocity + Lifetime", 2D) = "white" {}
+        _SheetFrameTex("Sheet Frame", 2D) = "white" {}
+        _SheetTiles("Sheet Tiles", Vector) = (0, 0, 0, 0)
         _LengthScale("Length Scale", Float) = 0
         _VelocityScale("Velocity Scale", Float) = 0
     }
@@ -41,6 +43,8 @@ Shader "GpuParticle/VatStretch"
             SAMPLER(sampler_ColorTex);
             TEXTURE2D(_VelocityLifetimeTex);
             SAMPLER(sampler_VelocityLifetimeTex);
+            TEXTURE2D(_SheetFrameTex);
+            SAMPLER(sampler_SheetFrameTex);
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
 
@@ -50,6 +54,7 @@ Shader "GpuParticle/VatStretch"
                 float4 _TexelSize;
                 float _LengthScale;
                 float _VelocityScale;
+                float4 _SheetTiles;
             CBUFFER_END
 
             struct InstanceData
@@ -74,6 +79,7 @@ Shader "GpuParticle/VatStretch"
                 float4 positionCS : SV_POSITION;
                 float4 color : COLOR;
                 float2 uv : TEXCOORD0;
+                float sheetFrame : TEXCOORD1;
             };
 
             float2 ParticleUv(uint particleIndex, uint frameIndex)
@@ -109,6 +115,10 @@ Shader "GpuParticle/VatStretch"
                 float4 velLifeB = SAMPLE_TEXTURE2D_LOD(_VelocityLifetimeTex, sampler_VelocityLifetimeTex, uvB, 0);
                 float4 velLife = lerp(velLifeA, velLifeB, t);
 
+                float sheetFrameA = SAMPLE_TEXTURE2D_LOD(_SheetFrameTex, sampler_SheetFrameTex, uvA, 0).r;
+                float sheetFrameB = SAMPLE_TEXTURE2D_LOD(_SheetFrameTex, sampler_SheetFrameTex, uvB, 0).r;
+                float sheetFrame = lerp(sheetFrameA, sheetFrameB, t);
+
                 float3 center = mul(inst.localToWorld, float4(posSize.xyz, 1)).xyz;
                 float size = posSize.w;
 
@@ -139,12 +149,27 @@ Shader "GpuParticle/VatStretch"
                 o.positionCS = TransformWorldToHClip(corner);
                 o.color = color;
                 o.uv = quadUv;
+                o.sheetFrame = sheetFrame;
                 return o;
+            }
+
+            float2 ApplyTextureSheet(float2 quadUv, float sheetFrame)
+            {
+                if (_SheetTiles.z <= 0.0)
+                {
+                    return quadUv;
+                }
+
+                float2 tileCount = _SheetTiles.xy;
+                float2 tileSize = 1.0 / tileCount;
+                float2 tileOffset = float2(fmod(sheetFrame, tileCount.x), floor(sheetFrame / tileCount.x)) * tileSize;
+                return quadUv * tileSize + tileOffset;
             }
 
             half4 frag(v2f i) : SV_Target
             {
-                half4 tex = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.uv);
+                float2 uv = ApplyTextureSheet(i.uv, i.sheetFrame);
+                half4 tex = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv);
                 return tex * i.color;
             }
             ENDHLSL
