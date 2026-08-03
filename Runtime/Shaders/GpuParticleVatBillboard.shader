@@ -144,6 +144,11 @@ Shader "GpuParticle/VatBillboard"
             half4 frag(v2f i) : SV_Target
             {
                 float2 uv = ApplyTextureSheet(i.uv, i.sheetFrame);
+                if (_SheetTiles.z > 0.0)
+                {
+                    return half4(uv.x, uv.y, 0.0, 1.0);
+                }
+
                 half4 tex = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv);
                 return tex * i.color;
             }
