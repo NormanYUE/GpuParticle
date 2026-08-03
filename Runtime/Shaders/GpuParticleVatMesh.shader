@@ -113,7 +113,7 @@ Shader "GpuParticle/VatMesh"
 
                 float sheetFrameA = SAMPLE_TEXTURE2D_LOD(_SheetFrameTex, sampler_SheetFrameTex, uvA, 0).r;
                 float sheetFrameB = SAMPLE_TEXTURE2D_LOD(_SheetFrameTex, sampler_SheetFrameTex, uvB, 0).r;
-                float sheetFrame = lerp(sheetFrameA, sheetFrameB, t);
+                float sheetFrame = round(lerp(sheetFrameA, sheetFrameB, t));
 
                 float3 localPos = RotateVector(v.vertex.xyz * posSize.w, rot) + posSize.xyz;
                 float3 worldPos = mul(inst.localToWorld, float4(localPos, 1)).xyz;

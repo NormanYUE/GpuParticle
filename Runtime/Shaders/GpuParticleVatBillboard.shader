@@ -106,7 +106,7 @@ Shader "GpuParticle/VatBillboard"
 
                 float sheetFrameA = SAMPLE_TEXTURE2D_LOD(_SheetFrameTex, sampler_SheetFrameTex, uvA, 0).r;
                 float sheetFrameB = SAMPLE_TEXTURE2D_LOD(_SheetFrameTex, sampler_SheetFrameTex, uvB, 0).r;
-                float sheetFrame = lerp(sheetFrameA, sheetFrameB, t);
+                float sheetFrame = round(lerp(sheetFrameA, sheetFrameB, t));
 
                 float3 center = mul(inst.localToWorld, float4(posSize.xyz, 1)).xyz;
                 float size = posSize.w;
