@@ -31,6 +31,7 @@ Shader "GpuParticle/VatBillboard"
             #pragma fragment frag
             #pragma multi_compile_instancing
             #pragma multi_compile_local _ ALIGNMENT_VIEW ALIGNMENT_FACING ALIGNMENT_WORLD ALIGNMENT_LOCAL
+            #pragma multi_compile_local _ RENDERMODE_HORIZONTAL RENDERMODE_VERTICAL
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
@@ -111,14 +112,27 @@ Shader "GpuParticle/VatBillboard"
                 float3 center = mul(inst.localToWorld, float4(posSize.xyz, 1)).xyz;
                 float size = posSize.w;
 
-                // World-space camera basis (URP)
-                float3 viewRight = normalize(UNITY_MATRIX_I_V._11_21_31);
-                float3 viewUp = normalize(UNITY_MATRIX_I_V._12_22_32);
-
                 float2 quadUv = v.uv0;
+                float3 axisX;
+                float3 axisY;
+
+#if defined(RENDERMODE_HORIZONTAL)
+                axisX = float3(1, 0, 0);
+                axisY = float3(0, 0, 1);
+#elif defined(RENDERMODE_VERTICAL)
+                float3 worldUp = float3(0, 1, 0);
+                float3 toCamera = normalize(_WorldSpaceCameraPos.xyz - center);
+                float3 forwardHorizontal = normalize(toCamera - dot(toCamera, worldUp) * worldUp);
+                axisX = normalize(cross(worldUp, forwardHorizontal));
+                axisY = worldUp;
+#else
+                axisX = normalize(UNITY_MATRIX_I_V._11_21_31);
+                axisY = normalize(UNITY_MATRIX_I_V._12_22_32);
+#endif
+
                 float3 corner = center
-                    + viewRight * (quadUv.x - 0.5) * size
-                    + viewUp * (quadUv.y - 0.5) * size;
+                    + axisX * (quadUv.x - 0.5) * size
+                    + axisY * (quadUv.y - 0.5) * size;
 
                 v2f o;
                 o.positionCS = TransformWorldToHClip(corner);
