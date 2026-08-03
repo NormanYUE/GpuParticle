@@ -1,16 +1,15 @@
-Shader "GpuParticle/VatStretch"
+// Example: a custom GPU-particle shader that uses the shared VAT input include.
+// Copy this file into your project, rename it, and replace the fragment logic
+// with your own special shader effects while keeping the vertex VAT sampling.
+Shader "GpuParticle/CustomExample"
 {
     Properties
     {
         _MainTex("Texture", 2D) = "white" {}
-        _PositionSizeTex("Position + Size", 2D) = "white" {}
-        _ColorTex("Color", 2D) = "white" {}
-        _RotationTex("Rotation", 2D) = "white" {}
-        _VelocityLifetimeTex("Velocity + Lifetime", 2D) = "white" {}
-        _SheetFrameTex("Sheet Frame", 2D) = "white" {}
-        _SheetTiles("Sheet Tiles", Vector) = (0, 0, 0, 0)
-        _LengthScale("Length Scale", Float) = 0
-        _VelocityScale("Velocity Scale", Float) = 0
+        _DissolveTex("Dissolve Texture", 2D) = "white" {}
+        _EdgeColor("Edge Color", Color) = (1, 1, 1, 1)
+        _DissolveThreshold("Dissolve Threshold", Range(0, 1)) = 0.5
+        _EdgeWidth("Edge Width", Range(0, 1)) = 0.1
     }
 
     SubShader
@@ -24,9 +23,9 @@ Shader "GpuParticle/VatStretch"
 
         Pass
         {
-            Name "GpuParticleVATStretch"
+            Name "GpuParticleCustomExample"
 
-            Blend SrcAlpha OneMinusSrcAlpha
+            Blend SrcAlpha One
             ZWrite Off
             Cull Off
 
@@ -34,10 +33,18 @@ Shader "GpuParticle/VatStretch"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_instancing
-            #pragma multi_compile_local _ ALIGNMENT_VIEW ALIGNMENT_FACING ALIGNMENT_WORLD ALIGNMENT_LOCAL
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "GpuParticleVatInput.hlsl"
+
+            TEXTURE2D(_DissolveTex);
+            SAMPLER(sampler_DissolveTex);
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _EdgeColor;
+                float _DissolveThreshold;
+                float _EdgeWidth;
+            CBUFFER_END
 
             struct appdata
             {
@@ -58,27 +65,14 @@ Shader "GpuParticle/VatStretch"
             {
                 GpuParticleVatSample s = GpuParticleSampleVat(instanceID, v.uv1.x);
 
-                float speed = length(s.worldVelocity);
-                float3 stretchDir = normalize(s.worldVelocity + 0.0001);
-                float stretchLen = s.size * _LengthScale + speed * _VelocityScale;
-
-                // Face the camera along the width axis while stretching along velocity.
-                float3 viewDir = normalize(UNITY_MATRIX_I_V._31_32_33);
-                float3 right = cross(viewDir, stretchDir);
-                float rightLen = length(right);
-                if (rightLen < 0.0001)
-                {
-                    right = normalize(UNITY_MATRIX_I_V._11_21_31);
-                }
-                else
-                {
-                    right /= rightLen;
-                }
+                // Simple view-facing billboard using VAT position and size.
+                float3 viewRight = normalize(UNITY_MATRIX_I_V._11_21_31);
+                float3 viewUp = normalize(UNITY_MATRIX_I_V._12_22_32);
 
                 float2 quadUv = v.uv0;
                 float3 corner = s.worldPosition
-                    + stretchDir * (quadUv.y - 0.5) * stretchLen
-                    + right * (quadUv.x - 0.5) * s.size;
+                    + viewRight * (quadUv.x - 0.5) * s.size
+                    + viewUp * (quadUv.y - 0.5) * s.size;
 
                 v2f o;
                 o.positionCS = TransformWorldToHClip(corner);
@@ -90,9 +84,20 @@ Shader "GpuParticle/VatStretch"
 
             half4 frag(v2f i) : SV_Target
             {
+                // Apply texture sheet animation before custom sampling.
                 float2 uv = GpuParticleApplyTextureSheet(i.uv, i.sheetFrame);
+
                 half4 tex = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv);
-                return tex * i.color;
+                half dissolve = SAMPLE_TEXTURE2D(_DissolveTex, sampler_DissolveTex, uv).r;
+
+                half edge = smoothstep(_DissolveThreshold - _EdgeWidth, _DissolveThreshold, dissolve);
+                half alpha = step(_DissolveThreshold, dissolve);
+
+                half4 col = tex * i.color;
+                col.rgb += _EdgeColor.rgb * (1.0 - edge) * _EdgeColor.a;
+                col.a *= alpha;
+
+                return col;
             }
             ENDHLSL
         }

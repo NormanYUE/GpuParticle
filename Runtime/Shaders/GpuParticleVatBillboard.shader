@@ -5,6 +5,8 @@ Shader "GpuParticle/VatBillboard"
         _MainTex("Texture", 2D) = "white" {}
         _PositionSizeTex("Position + Size", 2D) = "white" {}
         _ColorTex("Color", 2D) = "white" {}
+        _RotationTex("Rotation", 2D) = "white" {}
+        _VelocityLifetimeTex("Velocity + Lifetime", 2D) = "white" {}
         _SheetFrameTex("Sheet Frame", 2D) = "white" {}
         _SheetTiles("Sheet Tiles", Vector) = (0, 0, 0, 0)
     }
@@ -34,32 +36,7 @@ Shader "GpuParticle/VatBillboard"
             #pragma multi_compile_local _ RENDERMODE_HORIZONTAL RENDERMODE_VERTICAL
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-
-            TEXTURE2D(_PositionSizeTex);
-            SAMPLER(sampler_PositionSizeTex);
-            TEXTURE2D(_ColorTex);
-            SAMPLER(sampler_ColorTex);
-            TEXTURE2D(_SheetFrameTex);
-            SAMPLER(sampler_SheetFrameTex);
-            TEXTURE2D(_MainTex);
-            SAMPLER(sampler_MainTex);
-
-            CBUFFER_START(UnityPerMaterial)
-                float _Duration;
-                float _FrameCount;
-                float4 _TexelSize;
-                float4 _SheetTiles;
-            CBUFFER_END
-
-            struct InstanceData
-            {
-                float4x4 localToWorld;
-                float elapsedTime;
-                float timeScale;
-                uint seedVariant;
-            };
-
-            StructuredBuffer<InstanceData> _InstanceDataBuffer;
+            #include "GpuParticleVatInput.hlsl"
 
             struct appdata
             {
@@ -76,41 +53,9 @@ Shader "GpuParticle/VatBillboard"
                 float sheetFrame : TEXCOORD1;
             };
 
-            float2 ParticleUv(uint particleIndex, uint frameIndex)
-            {
-                float u = (particleIndex + 0.5) * _TexelSize.x;
-                float v = (frameIndex + 0.5) * _TexelSize.y;
-                return float2(u, v);
-            }
-
             v2f vert(appdata v, uint instanceID : SV_InstanceID)
             {
-                InstanceData inst = _InstanceDataBuffer[instanceID];
-                uint particleIndex = (uint)(v.uv1.x + 0.5);
-
-                float nt = inst.elapsedTime / max(_Duration, 0.0001);
-                float frameF = nt * (_FrameCount - 1);
-                uint frameA = (uint)frameF;
-                uint frameB = min(frameA + 1, (uint)_FrameCount - 1);
-                float t = frameF - (float)frameA;
-
-                float2 uvA = ParticleUv(particleIndex, frameA);
-                float2 uvB = ParticleUv(particleIndex, frameB);
-
-                float4 posSizeA = SAMPLE_TEXTURE2D_LOD(_PositionSizeTex, sampler_PositionSizeTex, uvA, 0);
-                float4 posSizeB = SAMPLE_TEXTURE2D_LOD(_PositionSizeTex, sampler_PositionSizeTex, uvB, 0);
-                float4 posSize = lerp(posSizeA, posSizeB, t);
-
-                float4 colorA = SAMPLE_TEXTURE2D_LOD(_ColorTex, sampler_ColorTex, uvA, 0);
-                float4 colorB = SAMPLE_TEXTURE2D_LOD(_ColorTex, sampler_ColorTex, uvB, 0);
-                float4 color = lerp(colorA, colorB, t);
-
-                float sheetFrameA = SAMPLE_TEXTURE2D_LOD(_SheetFrameTex, sampler_SheetFrameTex, uvA, 0).r;
-                float sheetFrameB = SAMPLE_TEXTURE2D_LOD(_SheetFrameTex, sampler_SheetFrameTex, uvB, 0).r;
-                float sheetFrame = round(lerp(sheetFrameA, sheetFrameB, t));
-
-                float3 center = mul(inst.localToWorld, float4(posSize.xyz, 1)).xyz;
-                float size = posSize.w;
+                GpuParticleVatSample s = GpuParticleSampleVat(instanceID, v.uv1.x);
 
                 float2 quadUv = v.uv0;
                 float3 axisX;
@@ -121,7 +66,7 @@ Shader "GpuParticle/VatBillboard"
                 axisY = float3(0, 0, 1);
 #elif defined(RENDERMODE_VERTICAL)
                 float3 worldUp = float3(0, 1, 0);
-                float3 toCamera = normalize(_WorldSpaceCameraPos.xyz - center);
+                float3 toCamera = normalize(_WorldSpaceCameraPos.xyz - s.worldPosition);
                 float3 forwardHorizontal = normalize(toCamera - dot(toCamera, worldUp) * worldUp);
                 axisX = normalize(cross(worldUp, forwardHorizontal));
                 axisY = worldUp;
@@ -130,34 +75,21 @@ Shader "GpuParticle/VatBillboard"
                 axisY = normalize(UNITY_MATRIX_I_V._12_22_32);
 #endif
 
-                float3 corner = center
-                    + axisX * (quadUv.x - 0.5) * size
-                    + axisY * (quadUv.y - 0.5) * size;
+                float3 corner = s.worldPosition
+                    + axisX * (quadUv.x - 0.5) * s.size
+                    + axisY * (quadUv.y - 0.5) * s.size;
 
                 v2f o;
                 o.positionCS = TransformWorldToHClip(corner);
-                o.color = color;
+                o.color = s.color;
                 o.uv = quadUv;
-                o.sheetFrame = sheetFrame;
+                o.sheetFrame = s.sheetFrame;
                 return o;
-            }
-
-            float2 ApplyTextureSheet(float2 quadUv, float sheetFrame)
-            {
-                if (_SheetTiles.z <= 0.0)
-                {
-                    return quadUv;
-                }
-
-                float2 tileCount = _SheetTiles.xy;
-                float2 tileSize = 1.0 / tileCount;
-                float2 tileOffset = float2(fmod(sheetFrame, tileCount.x), floor(sheetFrame / tileCount.x)) * tileSize;
-                return quadUv * tileSize + tileOffset;
             }
 
             half4 frag(v2f i) : SV_Target
             {
-                float2 uv = ApplyTextureSheet(i.uv, i.sheetFrame);
+                float2 uv = GpuParticleApplyTextureSheet(i.uv, i.sheetFrame);
                 half4 tex = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv);
                 return tex * i.color;
             }
