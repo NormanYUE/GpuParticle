@@ -1,5 +1,23 @@
 # Changelog / 更新日志
 
+## 0.2.0 - 2026-08-13
+
+### English
+
+- Added automatic VAT transform for project custom particle shaders: the baker now generates a `<name>_GpuVat` variant that inlines the original vertex/fragment code and rebuilds its input struct from VAT sampling, so GPU playback keeps custom shading with no user-side shader rewrite.
+- Added Custom Data VAT channels (`_CustomData1Tex`/`_CustomData2Tex`) with per-particle per-frame float4 capture for `Custom1`/`Custom2` vertex streams.
+- Vertex stream packing table covers Position, Center, Normal, Color, UV, AnimFrame, SizeX/XY/XYZ, Rotation, Rotation3D, Velocity, AgePercent and Custom1/2 scalar streams; unsupported streams fall back to Native playback.
+- Surface shaders, Shader Graph assets, Horizontal/Vertical billboards and unparseable shader forms now report explicit failure codes (17-20) and fall back to Native playback.
+- Added Compare Scene button in the baker window for manual A/B checks between native and GPU playback.
+
+### 中文
+
+- 新增项目内自定义粒子 Shader 的自动 VAT 变换：烘焙器生成 `<名字>_GpuVat` 变体，内联原 vertex/fragment 代码并以 VAT 采样重建输入结构体，GPU 回放保留自定义着色效果，用户无需改写 Shader。
+- 新增 Custom Data VAT 通道（`_CustomData1Tex`/`_CustomData2Tex`），按粒子按帧捕获 `Custom1`/`Custom2` 顶点流的 float4 数据。
+- 顶点流打包表覆盖 Position、Center、Normal、Color、UV、AnimFrame、SizeX/XY/XYZ、Rotation、Rotation3D、Velocity、AgePercent 与 Custom1/2 标量流；不支持的流自动回退原生播放。
+- Surface Shader、Shader Graph、Horizontal/VerticalBillboard 与无法静态解析的写法现在会给出明确失败码（17-20）并回退原生播放。
+- 烘焙窗口新增 Compare Scene 按钮，用于原生与 GPU 回放的手动 A/B 对比。
+
 ## 0.1.0 - 2026-07-28
 
 ### Changed

@@ -13,6 +13,12 @@ TEXTURE2D(_VelocityLifetimeTex);
 SAMPLER(sampler_VelocityLifetimeTex);
 TEXTURE2D(_SheetFrameTex);
 SAMPLER(sampler_SheetFrameTex);
+#if defined(GPU_PARTICLE_CUSTOM_DATA)
+TEXTURE2D(_CustomData1Tex);
+SAMPLER(sampler_CustomData1Tex);
+TEXTURE2D(_CustomData2Tex);
+SAMPLER(sampler_CustomData2Tex);
+#endif
 TEXTURE2D(_MainTex);
 SAMPLER(sampler_MainTex);
 
@@ -46,6 +52,8 @@ struct GpuParticleVatSample
     float3 worldVelocity;
     float lifetime;
     float sheetFrame;
+    float4 custom1;
+    float4 custom2;
     float4x4 localToWorld;
 };
 
@@ -90,6 +98,16 @@ GpuParticleVatSample GpuParticleSampleVat(uint instanceID, float particleIndexPa
     float sheetFrameB = SAMPLE_TEXTURE2D_LOD(_SheetFrameTex, sampler_SheetFrameTex, uvB, 0).r;
     float sheetFrame = round(lerp(sheetFrameA, sheetFrameB, t));
 
+#if defined(GPU_PARTICLE_CUSTOM_DATA)
+    float4 custom1A = SAMPLE_TEXTURE2D_LOD(_CustomData1Tex, sampler_CustomData1Tex, uvA, 0);
+    float4 custom1B = SAMPLE_TEXTURE2D_LOD(_CustomData1Tex, sampler_CustomData1Tex, uvB, 0);
+    float4 custom1 = lerp(custom1A, custom1B, t);
+
+    float4 custom2A = SAMPLE_TEXTURE2D_LOD(_CustomData2Tex, sampler_CustomData2Tex, uvA, 0);
+    float4 custom2B = SAMPLE_TEXTURE2D_LOD(_CustomData2Tex, sampler_CustomData2Tex, uvB, 0);
+    float4 custom2 = lerp(custom2A, custom2B, t);
+#endif
+
     GpuParticleVatSample s;
     s.localPosition = posSize.xyz;
     s.worldPosition = mul(inst.localToWorld, float4(posSize.xyz, 1)).xyz;
@@ -100,6 +118,13 @@ GpuParticleVatSample GpuParticleSampleVat(uint instanceID, float particleIndexPa
     s.worldVelocity = mul(inst.localToWorld, float4(velLife.xyz, 0)).xyz;
     s.lifetime = velLife.w;
     s.sheetFrame = sheetFrame;
+#if defined(GPU_PARTICLE_CUSTOM_DATA)
+    s.custom1 = custom1;
+    s.custom2 = custom2;
+#else
+    s.custom1 = 0;
+    s.custom2 = 0;
+#endif
     s.localToWorld = inst.localToWorld;
     return s;
 }
