@@ -1,5 +1,15 @@
 # Changelog / 更新日志
 
+## 0.4.5 - 2026-08-14
+
+### English
+
+- Fixed texture sheet animation rendering the whole atlas in custom-shader variants: the UV/UV2 vertex streams were filled with the raw quad corner UV, so user fragment code sampling `_MainTex` saw the entire sheet instead of the current tile. Both streams now carry the current-frame tile UV via `GpuParticleApplyTextureSheet` (a no-op when sheet animation is off), matching the native UV stream contract. Frame blending is still not reproduced (UV2 gets the current tile, not the next one).
+
+### 中文
+
+- 修复自定义 Shader 变体把序列帧图集整表渲染出来的问题：UV/UV2 顶点流之前填的是原始角点 UV，用户 frag 直接采样 `_MainTex` 时看到的是整张图集而非当前帧 tile。两个流现在通过 `GpuParticleApplyTextureSheet` 携带当前帧 tile UV（无序列帧时为恒等变换），与原生 UV 流契约一致。序列帧混合（frame blending）仍不还原（UV2 填当前帧而非下一帧）。
+
 ## 0.4.4 - 2026-08-14
 
 ### English
