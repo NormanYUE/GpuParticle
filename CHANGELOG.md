@@ -1,5 +1,15 @@
 # Changelog / 更新日志
 
+## 0.3.2 - 2026-08-14
+
+### English
+
+- Generated VAT shader variants now use consistent LF line endings: CRLF source shader bodies inlined into the variant are normalized at transform entry, so Unity no longer warns about inconsistent line endings on import.
+
+### 中文
+
+- 生成的 VAT 变体 Shader 现在统一使用 LF 行尾：CRLF 保存的源 Shader 函数体在变换入口归一化，Unity 导入时不再出现 mixed line endings 警告。
+
 ## 0.3.1 - 2026-08-13
 
 ### English
