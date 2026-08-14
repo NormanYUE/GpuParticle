@@ -1,5 +1,15 @@
 # Changelog / 更新日志
 
+## 0.4.2 - 2026-08-14
+
+### English
+
+- Fixed spurious `Material ... doesn't have a texture property '_BaseMap'` errors during baking: the `_BaseMap` → `_MainTex` texture bridge in material creation now checks `HasProperty` first, so shaders without either slot stay silent.
+
+### 中文
+
+- 修复烘焙时出现的 `Material ... doesn't have a texture property '_BaseMap'` 报错：材质创建中的 `_BaseMap` → `_MainTex` 纹理桥接现在先检查 `HasProperty`，没有对应属性的 Shader 不再报错。
+
 ## 0.4.1 - 2026-08-14
 
 ### English
