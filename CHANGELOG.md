@@ -1,5 +1,15 @@
 # Changelog / 更新日志
 
+## 0.4.6 - 2026-08-14
+
+### English
+
+- Fixed looping playback wrapping at the wrong period. Looping used to wrap at the full clip duration — the group-wide sampled timeline including the trailing lifetime of the last particles (e.g. 5.34s for a prefab whose own emission cycle is 1s) — so between replays there was a long dead window that native looping does not have. Each clip now records its source system's emission cycle (`startDelay + duration`) as `LoopPeriod`, and looping wraps there instead. When the baked timeline covers at least two cycles, sampling shifts one period in so leftovers from the previous cycle finish their lifetime, matching native loop overlap. When the timeline is shorter than two cycles the wrap falls back to in-place modulo (the tail is cut), and legacy clips without a loop period keep the old duration-based wrap.
+
+### 中文
+
+- 修复循环播放回绕周期错误的问题：之前循环按完整 clip 时长回绕——即包含最后粒子存活尾巴的组级采样时间轴（例如自身发射周期仅 1s 的 prefab 被按 5.34s 回绕）——导致两次重播之间出现原生循环没有的长空窗。现在每个 clip 记录源系统的发射周期（`startDelay + duration`）为 `LoopPeriod`，循环按该周期回绕；当烘焙时间轴覆盖 ≥2 个周期时，采样时间偏移一个周期，让上一周期残留粒子走完寿命，与原生循环的重叠行为一致。时间轴不足两个周期时退化为原位取模（尾巴被截断），无 loopPeriod 的旧资产保持原有的按时长回绕。
+
 ## 0.4.5 - 2026-08-14
 
 ### English
