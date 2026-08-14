@@ -1,5 +1,15 @@
 # Changelog / 更新日志
 
+## 0.3.1 - 2026-08-13
+
+### English
+
+- Fixed `HLSLcc: Duplicate constant buffer declaration: UnityPerMaterial` on Metal/GLES: the shared `GpuParticleVatInput.hlsl` cbuffer is now named `GpuParticleVat`, leaving `UnityPerMaterial` to user shaders, the example shader, and generated variants.
+
+### 中文
+
+- 修复 Metal/GLES 上的 `HLSLcc: Duplicate constant buffer declaration: UnityPerMaterial`：共享头文件 `GpuParticleVatInput.hlsl` 的 cbuffer 改名为 `GpuParticleVat`，把 `UnityPerMaterial` 留给用户 shader、示例 shader 与生成变体。
+
 ## 0.3.0 - 2026-08-13
 
 ### English

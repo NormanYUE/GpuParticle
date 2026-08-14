@@ -26,7 +26,10 @@ GPU_VAT_DECLARE_TEX(_CustomData2Tex, sampler_CustomData2Tex)
 #endif
 GPU_VAT_DECLARE_TEX(_MainTex, sampler_MainTex)
 
-CBUFFER_START(UnityPerMaterial)
+// Named GpuParticleVat instead of UnityPerMaterial: user shaders (and the generated
+// variants wrapping them) keep their own UnityPerMaterial cbuffer, and HLSLcc rejects
+// duplicate cbuffer declarations on Metal/GLES. Property binding is by name either way.
+CBUFFER_START(GpuParticleVat)
     float _Duration;
     float _FrameCount;
     float4 _TexelSize;
