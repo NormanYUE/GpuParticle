@@ -1,5 +1,15 @@
 # Changelog / 更新日志
 
+## 0.4.8 - 2026-08-14
+
+### English
+
+- Fixed mis-positioned and oversized particles for local-simulation systems whose node is not at the identity transform. Particle positions, velocities and rotations are reported in simulation space, but the bake always inverse-transformed them as if they were world-space — for local-sim systems that silently dropped the system node's own offset/scale/rotation at render time (e.g. a scaled-down, rotated cone emitter rendered ~1.9x larger and unrotated). The bake now branches on `simulationSpace`: local-sim states are captured as-is, world-sim states keep the inverse transform. Systems using Custom simulation space now fall back to Native instead of rendering wrong.
+
+### 中文
+
+- 修复节点不在恒等变换处的本地模拟粒子位置偏移、尺寸偏大的问题：粒子的位置/速度/旋转按模拟空间上报，但烘焙之前一律按世界空间做逆变换——对本地模拟系统，这会在渲染时静默丢掉系统节点自身的位移/缩放/旋转（例如一个缩小并旋转的锥形发射器被放大 ~1.9 倍且不旋转地渲染出来）。烘焙现在按 `simulationSpace` 分支：本地模拟状态原样采集，世界模拟状态保持逆变换。使用 Custom 模拟空间的系统现在回退原生，而不是渲染错误。
+
 ## 0.4.7 - 2026-08-14
 
 ### English
