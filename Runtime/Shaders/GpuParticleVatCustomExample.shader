@@ -37,6 +37,8 @@ Shader "GpuParticle/CustomExample"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "GpuParticleVatInput.hlsl"
 
+            TEXTURE2D(_MainTex);
+            SAMPLER(sampler_MainTex);
             TEXTURE2D(_DissolveTex);
             SAMPLER(sampler_DissolveTex);
 

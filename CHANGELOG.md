@@ -1,5 +1,15 @@
 # Changelog / 更新日志
 
+## 0.4.1 - 2026-08-14
+
+### English
+
+- Fixed `'tex2D': no matching 2 parameter intrinsic function` on Metal when the source shader declares `sampler2D _MainTex`: `_MainTex` is no longer declared by the shared `GpuParticleVatInput.hlsl` nor stripped from user code, so the user's own declaration and sampling calls always stay type-consistent. The built-in VAT shaders (Billboard/Stretch/Mesh/CustomExample) now declare `TEXTURE2D(_MainTex); SAMPLER(sampler_MainTex);` themselves.
+
+### 中文
+
+- 修复源 Shader 以 `sampler2D _MainTex` 声明时 Metal 报 `'tex2D': no matching 2 parameter intrinsic function` 的问题：共享头文件 `GpuParticleVatInput.hlsl` 不再声明 `_MainTex`，变换器也不再剥离用户声明，用户声明与采样调用始终保持类型自洽。内置 VAT Shader（Billboard/Stretch/Mesh/CustomExample）改为各自显式声明 `TEXTURE2D(_MainTex); SAMPLER(sampler_MainTex);`。
+
 ## 0.4.0 - 2026-08-14
 
 ### English

@@ -24,7 +24,9 @@ GPU_VAT_DECLARE_TEX(_SheetFrameTex, sampler_SheetFrameTex)
 GPU_VAT_DECLARE_TEX(_CustomData1Tex, sampler_CustomData1Tex)
 GPU_VAT_DECLARE_TEX(_CustomData2Tex, sampler_CustomData2Tex)
 #endif
-GPU_VAT_DECLARE_TEX(_MainTex, sampler_MainTex)
+// _MainTex is deliberately NOT declared here: it belongs to the user shader wrapped into
+// the variant, so the user declaration must survive to keep tex2D/SAMPLE_TEXTURE2D calls
+// type-consistent. Built-in VAT shaders declare it themselves.
 
 // Named GpuParticleVat instead of UnityPerMaterial: user shaders (and the generated
 // variants wrapping them) keep their own UnityPerMaterial cbuffer, and HLSLcc rejects

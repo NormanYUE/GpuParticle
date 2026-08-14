@@ -31,6 +31,9 @@ Shader "GpuParticle/VatMesh"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "GpuParticleVatInput.hlsl"
 
+            TEXTURE2D(_MainTex);
+            SAMPLER(sampler_MainTex);
+
             struct appdata
             {
                 float4 vertex : POSITION;
