@@ -105,7 +105,9 @@ GpuParticleVatSample GpuParticleSampleVat(uint instanceID, float particleIndexPa
 
     float sheetFrameA = GPU_VAT_SAMPLE_TEX(_SheetFrameTex, sampler_SheetFrameTex, uvA).r;
     float sheetFrameB = GPU_VAT_SAMPLE_TEX(_SheetFrameTex, sampler_SheetFrameTex, uvB).r;
-    float sheetFrame = round(lerp(sheetFrameA, sheetFrameB, t));
+    // Baked frames store integer tile indices; floor (not round) keeps the tile stable
+    // until the next sampled frame, matching native tile selection.
+    float sheetFrame = floor(lerp(sheetFrameA, sheetFrameB, t));
 
 #if defined(GPU_PARTICLE_CUSTOM_DATA)
     float4 custom1A = GPU_VAT_SAMPLE_TEX(_CustomData1Tex, sampler_CustomData1Tex, uvA);

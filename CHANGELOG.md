@@ -1,5 +1,15 @@
 # Changelog / 更新日志
 
+## 0.4.9 - 2026-08-14
+
+### English
+
+- Fixed wrong texture-sheet tiles in GPU playback. The bake stored the continuous sheet frame value and the VAT shader rounded it after interpolation, so particles with a fractional start frame (e.g. Two Constants 0–1) could round up to the next tile — on smoke-like sheets with mixed soft/hard tiles this showed up as darker, harder, seemingly larger particles. The bake now stores the floored integer tile (matching native truncation) and the shader floors after interpolation, so the tile stays stable until the next sampled frame.
+
+### 中文
+
+- 修复 GPU 播放中序列帧 tile 选错的问题：烘焙之前保存连续帧值，着色器插值后四舍五入——随机起始帧为小数（如 Two Constants 0–1）的粒子会被进位到下一帧 tile。对软硬 tile 混合的烟雾图集，表现为部分粒子更黑、更硬、看起来更大。烘焙现在保存向下取整的整数 tile（与原生截断一致），着色器插值后同样向下取整，tile 在下一个采样帧之前保持稳定。
+
 ## 0.4.8 - 2026-08-14
 
 ### English
