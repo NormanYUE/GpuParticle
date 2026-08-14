@@ -1,7 +1,7 @@
 {
   "name": "com.gpuparticle.tool",
   "displayName": "GPU Particle",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "unity": "2022.3",
   "description": "Reusable GPU particle baking and playback package with Native fallback.",
   "keywords": [

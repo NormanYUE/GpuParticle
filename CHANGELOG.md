@@ -1,5 +1,15 @@
 # Changelog / 更新日志
 
+## 0.4.0 - 2026-08-14
+
+### English
+
+- The `UV2` vertex stream is now supported for procedural billboard-family render modes (Billboard/Stretched/Horizontal/Vertical). Native `BakeMesh` probing showed these particles fill UV2 with a copy of the quad UV (next sheet tile when frame blending is on), so variants fill it with the same expression as the UV stream. This also keeps `Custom1`/`Custom2` aligned on `TEXCOORD1`/`TEXCOORD2` when UV2 pads `TEXCOORD0.zw`, matching the native packing. Mesh render mode with UV2 still falls back to Native (the VAT mesh's second UV channel carries the particle index).
+
+### 中文
+
+- `UV2` 顶点流现在支持程序化 billboard 家族渲染模式（Billboard/Stretched/Horizontal/Vertical）。经原生 `BakeMesh` 探针实证，这类粒子的 UV2 流是角点 UV 的翻版（序列帧混合开启时为下一帧 tile uv），变体以与 UV 流相同的表达式填充。UV2 占住 `TEXCOORD0.zw` 后，`Custom1`/`Custom2` 在 `TEXCOORD1`/`TEXCOORD2` 上与原生打包严格对齐。Mesh 模式使用 UV2 仍回退原生（VAT 网格的第二 UV 通道用于粒子索引）。
+
 ## 0.3.2 - 2026-08-14
 
 ### English
