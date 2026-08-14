@@ -1,5 +1,15 @@
 # Changelog / 更新日志
 
+## 0.4.7 - 2026-08-14
+
+### English
+
+- Fixed looping particles going almost invisible after the first replay. 0.4.6 wrapped at the emission period but then sampled one period into the timeline; the bake only captures a single emission cycle, so that window holds no live particles and every short-cycle system rendered nothing. Looping now wraps in place at `LoopPeriod`. Known limitation: particles still alive at the wrap point are cut instead of overlapping into the next cycle like native looping.
+
+### 中文
+
+- 修复循环粒子在第一次重播后几乎不可见的问题：0.4.6 按发射周期回绕后把采样时间偏移了一个周期，但烘焙只采集了一个发射周期，偏移窗口内没有活粒子，短周期系统全部渲空。循环现在按 `LoopPeriod` 原位回绕。已知限制：回绕点仍存活的粒子会被截断，不会像原生循环那样与下一周期重叠。
+
 ## 0.4.6 - 2026-08-14
 
 ### English
