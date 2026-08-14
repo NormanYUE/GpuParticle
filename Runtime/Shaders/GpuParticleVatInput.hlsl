@@ -1,26 +1,30 @@
 #ifndef GPU_PARTICLE_VAT_INPUT_INCLUDED
 #define GPU_PARTICLE_VAT_INPUT_INCLUDED
 
+// Generated CGPROGRAM variants define GPU_PARTICLE_VAT_UNITYCG before including this
+// file and supply UnityCG.cginc themselves; the default flavor is URP/HLSL.
+#if !defined(GPU_PARTICLE_VAT_UNITYCG)
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-
-TEXTURE2D(_PositionSizeTex);
-SAMPLER(sampler_PositionSizeTex);
-TEXTURE2D(_ColorTex);
-SAMPLER(sampler_ColorTex);
-TEXTURE2D(_RotationTex);
-SAMPLER(sampler_RotationTex);
-TEXTURE2D(_VelocityLifetimeTex);
-SAMPLER(sampler_VelocityLifetimeTex);
-TEXTURE2D(_SheetFrameTex);
-SAMPLER(sampler_SheetFrameTex);
-#if defined(GPU_PARTICLE_CUSTOM_DATA)
-TEXTURE2D(_CustomData1Tex);
-SAMPLER(sampler_CustomData1Tex);
-TEXTURE2D(_CustomData2Tex);
-SAMPLER(sampler_CustomData2Tex);
 #endif
-TEXTURE2D(_MainTex);
-SAMPLER(sampler_MainTex);
+
+#if defined(GPU_PARTICLE_VAT_UNITYCG)
+#define GPU_VAT_DECLARE_TEX(name, samp) sampler2D name;
+#define GPU_VAT_SAMPLE_TEX(name, samp, uv) tex2Dlod(name, float4(uv, 0.0, 0.0))
+#else
+#define GPU_VAT_DECLARE_TEX(name, samp) TEXTURE2D(name); SAMPLER(samp);
+#define GPU_VAT_SAMPLE_TEX(name, samp, uv) SAMPLE_TEXTURE2D_LOD(name, samp, uv, 0)
+#endif
+
+GPU_VAT_DECLARE_TEX(_PositionSizeTex, sampler_PositionSizeTex)
+GPU_VAT_DECLARE_TEX(_ColorTex, sampler_ColorTex)
+GPU_VAT_DECLARE_TEX(_RotationTex, sampler_RotationTex)
+GPU_VAT_DECLARE_TEX(_VelocityLifetimeTex, sampler_VelocityLifetimeTex)
+GPU_VAT_DECLARE_TEX(_SheetFrameTex, sampler_SheetFrameTex)
+#if defined(GPU_PARTICLE_CUSTOM_DATA)
+GPU_VAT_DECLARE_TEX(_CustomData1Tex, sampler_CustomData1Tex)
+GPU_VAT_DECLARE_TEX(_CustomData2Tex, sampler_CustomData2Tex)
+#endif
+GPU_VAT_DECLARE_TEX(_MainTex, sampler_MainTex)
 
 CBUFFER_START(UnityPerMaterial)
     float _Duration;
@@ -78,33 +82,33 @@ GpuParticleVatSample GpuParticleSampleVat(uint instanceID, float particleIndexPa
     float2 uvA = GpuParticleParticleUv(particleIndex, frameA);
     float2 uvB = GpuParticleParticleUv(particleIndex, frameB);
 
-    float4 posSizeA = SAMPLE_TEXTURE2D_LOD(_PositionSizeTex, sampler_PositionSizeTex, uvA, 0);
-    float4 posSizeB = SAMPLE_TEXTURE2D_LOD(_PositionSizeTex, sampler_PositionSizeTex, uvB, 0);
+    float4 posSizeA = GPU_VAT_SAMPLE_TEX(_PositionSizeTex, sampler_PositionSizeTex, uvA);
+    float4 posSizeB = GPU_VAT_SAMPLE_TEX(_PositionSizeTex, sampler_PositionSizeTex, uvB);
     float4 posSize = lerp(posSizeA, posSizeB, t);
 
-    float4 colorA = SAMPLE_TEXTURE2D_LOD(_ColorTex, sampler_ColorTex, uvA, 0);
-    float4 colorB = SAMPLE_TEXTURE2D_LOD(_ColorTex, sampler_ColorTex, uvB, 0);
+    float4 colorA = GPU_VAT_SAMPLE_TEX(_ColorTex, sampler_ColorTex, uvA);
+    float4 colorB = GPU_VAT_SAMPLE_TEX(_ColorTex, sampler_ColorTex, uvB);
     float4 color = lerp(colorA, colorB, t);
 
-    float4 rotA = SAMPLE_TEXTURE2D_LOD(_RotationTex, sampler_RotationTex, uvA, 0);
-    float4 rotB = SAMPLE_TEXTURE2D_LOD(_RotationTex, sampler_RotationTex, uvB, 0);
+    float4 rotA = GPU_VAT_SAMPLE_TEX(_RotationTex, sampler_RotationTex, uvA);
+    float4 rotB = GPU_VAT_SAMPLE_TEX(_RotationTex, sampler_RotationTex, uvB);
     float4 rot = normalize(lerp(rotA, rotB, t));
 
-    float4 velLifeA = SAMPLE_TEXTURE2D_LOD(_VelocityLifetimeTex, sampler_VelocityLifetimeTex, uvA, 0);
-    float4 velLifeB = SAMPLE_TEXTURE2D_LOD(_VelocityLifetimeTex, sampler_VelocityLifetimeTex, uvB, 0);
+    float4 velLifeA = GPU_VAT_SAMPLE_TEX(_VelocityLifetimeTex, sampler_VelocityLifetimeTex, uvA);
+    float4 velLifeB = GPU_VAT_SAMPLE_TEX(_VelocityLifetimeTex, sampler_VelocityLifetimeTex, uvB);
     float4 velLife = lerp(velLifeA, velLifeB, t);
 
-    float sheetFrameA = SAMPLE_TEXTURE2D_LOD(_SheetFrameTex, sampler_SheetFrameTex, uvA, 0).r;
-    float sheetFrameB = SAMPLE_TEXTURE2D_LOD(_SheetFrameTex, sampler_SheetFrameTex, uvB, 0).r;
+    float sheetFrameA = GPU_VAT_SAMPLE_TEX(_SheetFrameTex, sampler_SheetFrameTex, uvA).r;
+    float sheetFrameB = GPU_VAT_SAMPLE_TEX(_SheetFrameTex, sampler_SheetFrameTex, uvB).r;
     float sheetFrame = round(lerp(sheetFrameA, sheetFrameB, t));
 
 #if defined(GPU_PARTICLE_CUSTOM_DATA)
-    float4 custom1A = SAMPLE_TEXTURE2D_LOD(_CustomData1Tex, sampler_CustomData1Tex, uvA, 0);
-    float4 custom1B = SAMPLE_TEXTURE2D_LOD(_CustomData1Tex, sampler_CustomData1Tex, uvB, 0);
+    float4 custom1A = GPU_VAT_SAMPLE_TEX(_CustomData1Tex, sampler_CustomData1Tex, uvA);
+    float4 custom1B = GPU_VAT_SAMPLE_TEX(_CustomData1Tex, sampler_CustomData1Tex, uvB);
     float4 custom1 = lerp(custom1A, custom1B, t);
 
-    float4 custom2A = SAMPLE_TEXTURE2D_LOD(_CustomData2Tex, sampler_CustomData2Tex, uvA, 0);
-    float4 custom2B = SAMPLE_TEXTURE2D_LOD(_CustomData2Tex, sampler_CustomData2Tex, uvB, 0);
+    float4 custom2A = GPU_VAT_SAMPLE_TEX(_CustomData2Tex, sampler_CustomData2Tex, uvA);
+    float4 custom2B = GPU_VAT_SAMPLE_TEX(_CustomData2Tex, sampler_CustomData2Tex, uvB);
     float4 custom2 = lerp(custom2A, custom2B, t);
 #endif
 

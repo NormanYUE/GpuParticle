@@ -1,5 +1,25 @@
 # Changelog / 更新日志
 
+## 0.3.0 - 2026-08-13
+
+### English
+
+- Extended the custom shader VAT transform to `CGPROGRAM` and `HLSLINCLUDE` shader forms: CGPROGRAM sources now generate UnityCG-flavored variants (`sampler2D`/`tex2Dlod` via a dual-flavor `GpuParticleVatInput.hlsl`), and shared `HLSLINCLUDE` blocks recover their pass state from the following `Pass` body.
+- Horizontal/Vertical billboard render modes are now supported by the transform (corner math mirrors the built-in VAT billboard shader) instead of falling back to Native.
+- Input struct parsing now tolerates `#if/#elif/#else` conditional fields (guards are replayed onto the fill statements), `UNITY_VERTEX_INPUT_INSTANCE_ID` macro lines, and unknown semantics such as `TANGENT` (zero-filled, matching unfed native attributes).
+- Fixed TEXCOORD packing in generated wrappers: Position/Normal/Color occupy their own semantic slots instead of TEXCOORD space, and out-of-range components are zero-padded.
+- Generated variants now ship with a sibling copy of `GpuParticleVatInput.hlsl`, and relative `#include` directives in source shaders are rewritten to project-rooted paths so variants compile from the generated folder.
+- Fixed malformed `.meta` GUIDs for `GpuParticleVatInput.hlsl` and `GpuParticleVatCustomExample.shader` that Unity's YAML parser rejected.
+
+### 中文
+
+- 自定义 Shader VAT 变换扩展支持 `CGPROGRAM` 与 `HLSLINCLUDE` 形态：CGPROGRAM 来源生成 UnityCG 风格变体（`GpuParticleVatInput.hlsl` 双 flavor 宏提供 `sampler2D`/`tex2Dlod`），共享 `HLSLINCLUDE` 块会从随后的 `Pass` 体补抓 Pass 状态。
+- Horizontal/VerticalBillboard 渲染模式现在支持自动变换（角点数学镜像内置 VAT Billboard Shader），不再回退原生。
+- 输入结构体解析容忍 `#if/#elif/#else` 条件字段（guard 原样回放到填充语句）、`UNITY_VERTEX_INPUT_INSTANCE_ID` 宏行与未知语义字段（如 `TANGENT`，零填充，与原生未喂属性一致）。
+- 修复生成 wrapper 的 TEXCOORD 打包：Position/Normal/Color 占独立语义槽、不再占用 TEXCOORD 空间，越界分量零填充。
+- 生成变体现在会随带一份 `GpuParticleVatInput.hlsl` 拷贝，源 Shader 的相对 `#include` 会重写为项目根路径，保证变体在生成目录下可编译。
+- 修复 `GpuParticleVatInput.hlsl` 与 `GpuParticleVatCustomExample.shader` 的 `.meta` GUID 格式问题（Unity YAML 解析器无法识别）。
+
 ## 0.2.0 - 2026-08-13
 
 ### English
