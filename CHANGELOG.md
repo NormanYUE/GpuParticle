@@ -1,5 +1,15 @@
 # Changelog / 更新日志
 
+## 0.4.4 - 2026-08-14
+
+### English
+
+- Fixed wrong corner math for particle systems that share one custom shader with different render modes. The transform inlines render-mode corner math into the generated variant, but all systems wrote to the same `<ShaderName>_GpuVat.shader` file — the last write won, so Horizontal/Vertical/Stretched systems sharing a shader with Billboard ones rendered camera-facing. Variants are now cached and named per (shader, render mode, vertex streams, custom data) combination: Billboard keeps `_GpuVat`, other modes get `_H`/`_V`/`_S`/`_M` suffixes, and stream-set collisions get a numeric suffix.
+
+### 中文
+
+- 修复共享同一自定义 Shader 但渲染模式不同的系统角点数学错误的问题：变换把渲染模式的角点数学内联进变体，但所有系统都写同一个 `<ShaderName>_GpuVat.shader` 文件——最后写入的覆盖其余，导致与 Billboard 系统共享 Shader 的水平/垂直/拉伸系统被渲成面向相机。变体现在按 (Shader, 渲染模式, 顶点流, CustomData) 组合缓存与命名：Billboard 保持 `_GpuVat`，其余模式加 `_H`/`_V`/`_S`/`_M` 后缀，流集合冲突追加数字后缀。
+
 ## 0.4.3 - 2026-08-14
 
 ### English
