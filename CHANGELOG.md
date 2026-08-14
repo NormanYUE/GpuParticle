@@ -1,5 +1,15 @@
 # Changelog / 更新日志
 
+## 0.4.3 - 2026-08-14
+
+### English
+
+- Fixed stale Native bindings surviving a successful bake. A failed bake writes a `Native` marker binding onto the source prefab root, but a later successful bake never refreshed it, and the runtime prefab builder copied that stale binding (with its particle references stripped to null) onto the runtime prefab root — so root-level readiness probes like `GetComponentInChildren<GpuParticleBinding>` reported `status=Native, clip=null` even though every system baked successfully. Successful bakes now refresh the source prefab binding to `GpuReady`, the runtime prefab builder strips copied bake artifacts before writing fresh per-system bindings, and group bakes add a summary binding on the runtime prefab root.
+
+### 中文
+
+- 修复陈旧 Native 标记在成功烘焙后残留的问题：失败的烘焙会在源 Prefab 根节点写入 Native 状态的 `GpuParticleBinding`，而之后成功的烘焙不会刷新它；同时运行时 Prefab 构建器会把这份陈旧 binding（其粒子引用已被剥离为空）一并拷到运行时 Prefab 根节点——导致 `GetComponentInChildren<GpuParticleBinding>` 这类根级就绪探测误报 `status=Native, clip=null`，即使所有系统都已成功烘焙。现在成功烘焙会把源 Prefab 的 binding 刷新为 `GpuReady`，运行时 Prefab 构建器在写入各系统新 binding 前会剥离拷贝来的旧烘焙组件，组烘焙还会在运行时 Prefab 根节点补一个汇总 binding。
+
 ## 0.4.2 - 2026-08-14
 
 ### English
