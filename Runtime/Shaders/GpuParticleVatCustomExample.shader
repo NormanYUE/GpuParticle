@@ -72,9 +72,11 @@ Shader "GpuParticle/CustomExample"
                 float3 viewUp = normalize(UNITY_MATRIX_I_V._12_22_32);
 
                 float2 quadUv = v.uv0;
+                float2 pivotUv = GpuParticlePivotOffset(quadUv);
+                float size = s.size * GpuParticleInstanceScale(s.localToWorld);
                 float3 corner = s.worldPosition
-                    + viewRight * (quadUv.x - 0.5) * s.size
-                    + viewUp * (quadUv.y - 0.5) * s.size;
+                    + viewRight * pivotUv.x * size
+                    + viewUp * pivotUv.y * size;
 
                 v2f o;
                 o.positionCS = TransformWorldToHClip(corner);

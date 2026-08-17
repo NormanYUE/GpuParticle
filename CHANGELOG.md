@@ -1,5 +1,15 @@
 # Changelog / 更新日志
 
+## 0.4.10 - 2026-08-17
+
+### English
+
+- Fixed Stretch Billboard looking unstretched and billboard particles rendering oversized on non-identity nodes. VAT corner math ignored `ParticleSystemRenderer.pivot` (e.g. sparks with `pivot.y = 0.5`) so stretch quads stayed centered instead of anchored, and billboard/stretch sizes were applied in world space without the instance transform's hierarchy/local scale (e.g. a 0.53-scale child looked ~1.9x too large). The bake now writes `renderer.pivot` onto `_ParticlePivot`, and VAT shaders (built-in + custom variants) apply pivot offsets plus `GpuParticleInstanceScale(localToWorld)`. Mesh mode is unchanged (it already multiplies through `localToWorld`). Re-bake required for existing clips so materials pick up the pivot.
+
+### 中文
+
+- 修复 Stretch Billboard 看起来没有拉伸、以及非恒等节点上 Billboard 粒子偏大的问题：VAT 角点数学之前忽略 `ParticleSystemRenderer.pivot`（例如火花 `pivot.y = 0.5`），拉伸四边形始终居中而非锚定；Billboard/Stretch 的 size 在世界空间应用时也不乘实例层级/本地缩放（例如 scale≈0.53 的子节点会偏大约 1.9 倍）。烘焙现在把 `renderer.pivot` 写入 `_ParticlePivot`，VAT Shader（内置与自定义变体）应用 pivot 偏移并乘 `GpuParticleInstanceScale(localToWorld)`。Mesh 模式不变（本身已走 `localToWorld`）。已有 clip 需要重新烘焙，材质才会带上 pivot。
+
 ## 0.4.9 - 2026-08-14
 
 ### English

@@ -11,6 +11,7 @@ Shader "GpuParticle/VatStretch"
         _SheetTiles("Sheet Tiles", Vector) = (0, 0, 0, 0)
         _LengthScale("Length Scale", Float) = 0
         _VelocityScale("Velocity Scale", Float) = 0
+        _ParticlePivot("Particle Pivot", Vector) = (0, 0, 0, 0)
     }
 
     SubShader
@@ -61,9 +62,14 @@ Shader "GpuParticle/VatStretch"
             {
                 GpuParticleVatSample s = GpuParticleSampleVat(instanceID, v.uv1.x);
 
+                float instanceScale = GpuParticleInstanceScale(s.localToWorld);
+                float size = s.size * instanceScale;
                 float speed = length(s.worldVelocity);
                 float3 stretchDir = normalize(s.worldVelocity + 0.0001);
-                float stretchLen = s.size * _LengthScale + speed * _VelocityScale;
+                // Match Unity: stretchLen = size * lengthScale + speed * velocityScale.
+                // Size already carries instanceScale so Hierarchy/Local scalingMode is honored;
+                // speed is world-space so it is already scaled by the instance basis.
+                float stretchLen = size * _LengthScale + speed * _VelocityScale;
 
                 // Face the camera along the width axis while stretching along velocity.
                 float3 viewDir = normalize(UNITY_MATRIX_I_V._31_32_33);
@@ -79,9 +85,10 @@ Shader "GpuParticle/VatStretch"
                 }
 
                 float2 quadUv = v.uv0;
+                float2 pivotUv = GpuParticlePivotOffset(quadUv);
                 float3 corner = s.worldPosition
-                    + stretchDir * (quadUv.y - 0.5) * stretchLen
-                    + right * (quadUv.x - 0.5) * s.size;
+                    + stretchDir * pivotUv.y * stretchLen
+                    + right * pivotUv.x * size;
 
                 v2f o;
                 o.positionCS = TransformWorldToHClip(corner);

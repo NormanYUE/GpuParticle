@@ -9,6 +9,7 @@ Shader "GpuParticle/VatBillboard"
         _VelocityLifetimeTex("Velocity + Lifetime", 2D) = "white" {}
         _SheetFrameTex("Sheet Frame", 2D) = "white" {}
         _SheetTiles("Sheet Tiles", Vector) = (0, 0, 0, 0)
+        _ParticlePivot("Particle Pivot", Vector) = (0, 0, 0, 0)
     }
 
     SubShader
@@ -61,6 +62,8 @@ Shader "GpuParticle/VatBillboard"
                 GpuParticleVatSample s = GpuParticleSampleVat(instanceID, v.uv1.x);
 
                 float2 quadUv = v.uv0;
+                float2 pivotUv = GpuParticlePivotOffset(quadUv);
+                float size = s.size * GpuParticleInstanceScale(s.localToWorld);
                 float3 axisX;
                 float3 axisY;
 
@@ -79,8 +82,8 @@ Shader "GpuParticle/VatBillboard"
 #endif
 
                 float3 corner = s.worldPosition
-                    + axisX * (quadUv.x - 0.5) * s.size
-                    + axisY * (quadUv.y - 0.5) * s.size;
+                    + axisX * pivotUv.x * size
+                    + axisY * pivotUv.y * size;
 
                 v2f o;
                 o.positionCS = TransformWorldToHClip(corner);

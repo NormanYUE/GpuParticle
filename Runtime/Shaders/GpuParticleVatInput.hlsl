@@ -38,6 +38,9 @@ CBUFFER_START(GpuParticleVat)
     float4 _SheetTiles;
     float _LengthScale;
     float _VelocityScale;
+    // ParticleSystemRenderer.pivot: units of particle size relative to the particle center.
+    // (0,0,0) is center; (0,0.5,0) pins the top edge to the particle position (common for sparks).
+    float4 _ParticlePivot;
 CBUFFER_END
 
 struct InstanceData
@@ -144,6 +147,24 @@ float3 GpuParticleRotateVector(float3 v, float4 q)
 {
     float3 t = 2.0 * cross(q.xyz, v);
     return v + q.w * t + cross(q.xyz, t);
+}
+
+// Billboard / Stretch particles build corners in world space with a scalar size, so the
+// instance transform's scale never reaches them (unlike Mesh mode which multiplies through
+// localToWorld). Average the basis lengths to match Unity Hierarchy/Local scalingMode.
+float GpuParticleInstanceScale(float4x4 localToWorld)
+{
+    float sx = length(float3(localToWorld._11, localToWorld._21, localToWorld._31));
+    float sy = length(float3(localToWorld._12, localToWorld._22, localToWorld._32));
+    float sz = length(float3(localToWorld._13, localToWorld._23, localToWorld._33));
+    return (sx + sy + sz) * (1.0 / 3.0);
+}
+
+// Map a 0..1 quad corner through Unity's particle pivot. Pivot is expressed in particle
+// diameters relative to the center, so uv 0.5 is the un-pivoted center.
+float2 GpuParticlePivotOffset(float2 quadUv)
+{
+    return quadUv - 0.5 - _ParticlePivot.xy;
 }
 
 float2 GpuParticleApplyTextureSheet(float2 quadUv, float sheetFrame)
