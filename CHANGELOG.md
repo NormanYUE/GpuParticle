@@ -1,5 +1,15 @@
 # Changelog / 更新日志
 
+## 0.4.13 - 2026-08-17
+
+### English
+
+- Fixed Stretch Billboard length/pivot not applying on custom-shader variants (Sparks, Ci_Add). `lengthScale`/`velocityScale`/`pivot` were written only onto the material asset; the shared `GpuParticleVat` cbuffer is not `UnityPerMaterial`, so those Material values often never reached the GPU and the shader fell back to defaults (`LengthScale=1`, `Pivot=0`) — trails looked ~4x too short and sparks started higher because the quad stayed centered. Clips now store the three values and the render system rebinds them via MaterialPropertyBlock every draw (alongside Duration/FrameCount). Re-bake required so clips receive the new fields.
+
+### 中文
+
+- 修复自定义 Shader 变体上 Stretch Billboard 长度/枢轴不生效的问题（Sparks、Ci_Add）。`lengthScale`/`velocityScale`/`pivot` 之前只写在材质资源上；共享 `GpuParticleVat` cbuffer 不是 `UnityPerMaterial`，这些 Material 值经常到不了 GPU，着色器回退到默认（`LengthScale=1`、`Pivot=0`）——拖尾大约短 4 倍，火花因四边形仍居中而看起来起点偏高。Clip 现在保存这三个值，渲染系统每帧通过 MaterialPropertyBlock 重新绑定（与 Duration/FrameCount 相同）。需要重新烘焙，clip 才会带上新字段。
+
 ## 0.4.12 - 2026-08-17
 
 ### English
