@@ -1,5 +1,15 @@
 # Changelog / 更新日志
 
+## 0.4.12 - 2026-08-17
+
+### English
+
+- Fixed custom-shader VAT variants scattering or mis-scaling particle quads. Generated variants previously kept `#pragma multi_compile_instancing`, but `DrawMeshInstancedProcedural` does not fill `unity_ObjectToWorldArray` — so user code such as `UnityObjectToClipPos` / `mul(unity_ObjectToWorld, v.vertex)` (AllIn1Vfx, UnlitEffectBase02, etc.) transformed world-space corners through garbage instance matrices. Variants no longer enable Unity instancing, strip any user-authored instancing pragma, and force `unity_ObjectToWorld` / `UNITY_MATRIX_M` to identity so object-space clip helpers treat the wrapper's world-space POSITION as-is. Re-bake required so generated `*_GpuVat` shaders are regenerated.
+
+### 中文
+
+- 修复自定义 Shader VAT 变体粒子四边形散乱/缩放错误的问题：生成变体之前保留 `#pragma multi_compile_instancing`，但 `DrawMeshInstancedProcedural` 不会填充 `unity_ObjectToWorldArray`——用户代码如 `UnityObjectToClipPos` / `mul(unity_ObjectToWorld, v.vertex)`（AllIn1Vfx、UnlitEffectBase02 等）会把世界空间角点再经垃圾实例矩阵变换。变体不再开启 Unity 实例化、剥离用户源中的 instancing pragma，并强制 `unity_ObjectToWorld` / `UNITY_MATRIX_M` 为恒等，使 object-space 裁剪辅助函数把 wrapper 填入的世界空间 POSITION 原样使用。需要重新烘焙以重新生成 `*_GpuVat` 变体。
+
 ## 0.4.11 - 2026-08-17
 
 ### English
