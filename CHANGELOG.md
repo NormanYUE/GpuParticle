@@ -1,5 +1,15 @@
 # Changelog / 更新日志
 
+## 0.4.11 - 2026-08-17
+
+### English
+
+- Fixed texture-sheet particles always sampling tile 0. Unity authors `startFrame` in normalized 0..1 space (the common "random whole sheet" preset is Two Constants 0..0.9999), but the bake added that value as a raw tile index — `floor(0..1)` is always 0. Smoke systems with mixed soft/hard tiles therefore rendered only the first tile (darker, harder, seemingly larger). The bake now multiplies `startFrame` by the tile/sprite count. Also write `_Duration`/`_FrameCount`/`_TexelSize` onto baked materials and re-bind them via MaterialPropertyBlock every draw so cold loads and non-UnityPerMaterial cbuffers never keep the property defaults of 1/1. Re-bake required.
+
+### 中文
+
+- 修复序列帧粒子始终采样 tile 0 的问题：Unity 的 `startFrame` 以归一化 0..1 编写（常见“整表随机”预设是 Two Constants 0..0.9999），但烘焙把它当原始 tile 索引相加——`floor(0..1)` 永远是 0。软硬 tile 混合的烟雾因此只渲染第一格（更黑、更硬、看起来更大）。烘焙现在把 `startFrame` 乘以 tile/sprite 数。同时把 `_Duration`/`_FrameCount`/`_TexelSize` 写入烘焙材质，并在每帧绘制时通过 MaterialPropertyBlock 重新绑定，避免冷加载和非 UnityPerMaterial cbuffer 一直用属性默认值 1/1。已有 clip 需要重新烘焙。
+
 ## 0.4.10 - 2026-08-17
 
 ### English
